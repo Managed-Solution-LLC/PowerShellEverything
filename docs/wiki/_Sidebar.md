@@ -50,6 +50,9 @@
 
 ## 🛠️ Tools & Utilities
 
+### Client Computer
+- [Set-FortinetVPNRegistry](Client%20Computer/Set-FortinetVPNRegistry)
+
 ### Azure Scripts
 - Azure Automation _(documentation pending)_
 
