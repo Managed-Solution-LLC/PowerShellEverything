@@ -17,8 +17,24 @@
     Auto-detected if not specified.
 .PARAMETER OutputDirectory
     Custom output directory. Default is Documents\O365Reports_<timestamp>.
+    
+.PARAMETER SkipSharePoint
+    Skip SharePoint Online and OneDrive collection. Use this if you encounter
+    authentication issues with SharePoint or don't have SharePoint admin permissions.
+    
+.PARAMETER SkipLicensing
+    Skip MSOnline licensing data collection. Use this if MSOnline authentication fails
+    due to MFA or conditional access policies.
+    
 .EXAMPLE
     .\Get-QuickO365Report.ps1 -TenantDomain "contoso"
+    
+.EXAMPLE
+    .\Get-QuickO365Report.ps1 -SkipSharePoint -SkipLicensing
+    
+    Collects only Exchange/mailbox data, skipping SharePoint and licensing modules
+    that may have authentication issues.
+    
 .NOTES
     Author: W. Ford (Managed Solution LLC)
     Date: 2025-12-23
@@ -27,11 +43,17 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, HelpMessage="SharePoint admin domain (e.g., 'contoso' for contoso-admin.sharepoint.com)")]
     [string]$TenantDomain,
     
-    [Parameter(Mandatory=$false)]
-    [string]$OutputDirectory = "$env:USERPROFILE\Documents\O365Report_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+    [Parameter(Mandatory=$false, HelpMessage="Custom output directory")]
+    [string]$OutputDirectory = "$env:USERPROFILE\Documents\O365Report_$(Get-Date -Format 'yyyyMMdd_HHmmss')",
+    
+    [Parameter(Mandatory=$false, HelpMessage="Skip SharePoint/OneDrive collection")]
+    [switch]$SkipSharePoint,
+    
+    [Parameter(Mandatory=$false, HelpMessage="Skip MSOnline licensing data collection")]
+    [switch]$SkipLicensing
 )
 
 $ErrorActionPreference = 'Stop'
@@ -102,24 +124,42 @@ if ([string]::IsNullOrEmpty($TenantDomain)) {
 
 # Connect to MSOnline (for licensing data)
 $msolConnected = $false
-Write-Host ""
-Write-Host "[INFO] Connecting to MSOnline..." -ForegroundColor Cyan
-Write-Host "   (Use same credentials as Exchange)" -ForegroundColor Yellow
 
-try {
-    if ($PSVersionTable.PSVersion.Major -ge 7) {
-        Import-Module MSOnline -UseWindowsPowerShell -ErrorAction Stop -WarningAction SilentlyContinue
-    } else {
-        Import-Module MSOnline -ErrorAction Stop
-    }
-    Connect-MsolService -ErrorAction Stop
-    Write-Host "[OK] Connected to MSOnline" -ForegroundColor Green
-    $msolConnected = $true
+if ($SkipLicensing) {
+    Write-Host ""
+    Write-Host "[SKIP] Skipping MSOnline licensing collection (per -SkipLicensing parameter)" -ForegroundColor Yellow
 }
-catch {
-    Write-Host "[WARNING] Failed to connect to MSOnline" -ForegroundColor Yellow
-    Write-Host "   License data will not be collected" -ForegroundColor Yellow
-    Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Yellow
+else {
+    Write-Host ""
+    Write-Host "[INFO] Connecting to MSOnline..." -ForegroundColor Cyan
+    Write-Host "   (Use same credentials as Exchange)" -ForegroundColor Yellow
+    Write-Host "   Note: MSOnline module has authentication limitations with MFA/modern auth" -ForegroundColor Gray
+
+    try {
+        if ($PSVersionTable.PSVersion.Major -ge 7) {
+            Import-Module MSOnline -UseWindowsPowerShell -ErrorAction Stop -WarningAction SilentlyContinue
+        } else {
+            Import-Module MSOnline -ErrorAction Stop
+        }
+        Connect-MsolService -ErrorAction Stop
+        Write-Host "[OK] Connected to MSOnline" -ForegroundColor Green
+        $msolConnected = $true
+    }
+    catch {
+        Write-Host "[WARNING] Failed to connect to MSOnline" -ForegroundColor Yellow
+        Write-Host "   License data will not be collected" -ForegroundColor Yellow
+        Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Yellow
+        
+        if ($_.Exception.Message -like "*Negotiate*" -or $_.Exception.Message -like "*forbidden*") {
+            Write-Host "" -ForegroundColor Yellow
+            Write-Host "   Troubleshooting: This error often occurs with MFA/Conditional Access" -ForegroundColor Yellow
+            Write-Host "   - MSOnline module doesn't fully support modern authentication" -ForegroundColor Yellow
+            Write-Host "   - Try running from a non-MFA admin account if available" -ForegroundColor Yellow
+            Write-Host "   - Or use app password if your org allows" -ForegroundColor Yellow
+            Write-Host "   - Or rerun with: -SkipLicensing to skip this module" -ForegroundColor Yellow
+            Write-Host "   - Assessment will continue without license details" -ForegroundColor Yellow
+        }
+    }
 }
 
 # Collect license information if connected
@@ -152,21 +192,78 @@ if ($msolConnected) {
 
 # Connect to SharePoint Online
 $spoConnected = $false
-Write-Host ""
-Write-Host "[INFO] Connecting to SharePoint Online..." -ForegroundColor Cyan
-Write-Host "   (Sign-in prompt will appear)" -ForegroundColor Yellow
 
-try {
-    $adminUrl = "https://$TenantDomain-admin.sharepoint.com"
-    Import-Module Microsoft.Online.SharePoint.PowerShell -DisableNameChecking -ErrorAction Stop
-    Connect-SPOService -Url $adminUrl -ErrorAction Stop
-    Write-Host "[OK] Connected to SharePoint Online" -ForegroundColor Green
-    $spoConnected = $true
+if ($SkipSharePoint) {
+    Write-Host ""
+    Write-Host "[SKIP] Skipping SharePoint Online collection (per -SkipSharePoint parameter)" -ForegroundColor Yellow
 }
-catch {
-    Write-Host "[WARNING] Failed to connect to SharePoint Online" -ForegroundColor Yellow
-    Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Yellow
-    Write-Host "   Continuing with mailbox data only..." -ForegroundColor Yellow
+else {
+    Write-Host ""
+    Write-Host "[INFO] Connecting to SharePoint Online..." -ForegroundColor Cyan
+    Write-Host "   (Sign-in prompt will appear)" -ForegroundColor Yellow
+
+    $adminUrl = "https://$TenantDomain-admin.sharepoint.com"
+    Write-Host "   Admin URL: $adminUrl" -ForegroundColor Gray
+
+    try {
+        Import-Module Microsoft.Online.SharePoint.PowerShell -DisableNameChecking -ErrorAction Stop
+        
+        # Try connecting with retry logic
+        $maxRetries = 2
+        $retryCount = 0
+        $connected = $false
+        
+        while (-not $connected -and $retryCount -lt $maxRetries) {
+            try {
+                if ($retryCount -gt 0) {
+                    Write-Host "   Retry attempt $retryCount of $($maxRetries - 1)..." -ForegroundColor Yellow
+                }
+                Connect-SPOService -Url $adminUrl -ErrorAction Stop
+                $connected = $true
+                $spoConnected = $true
+                Write-Host "[OK] Connected to SharePoint Online" -ForegroundColor Green
+            }
+            catch {
+                $retryCount++
+                if ($retryCount -lt $maxRetries) {
+                    Write-Host "   Connection failed, retrying..." -ForegroundColor Yellow
+                    Start-Sleep -Seconds 2
+                }
+                else {
+                    throw
+                }
+            }
+        }
+    }
+    catch {
+        Write-Host "[WARNING] Failed to connect to SharePoint Online" -ForegroundColor Yellow
+        Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Yellow
+        
+        if ($_.Exception.Message -like "*401*" -or $_.Exception.Message -like "*Unauthorized*") {
+            Write-Host "" -ForegroundColor Yellow
+            Write-Host "   Troubleshooting - 401 Unauthorized:" -ForegroundColor Yellow
+            Write-Host "   1. Verify tenant domain name is correct: '$TenantDomain'" -ForegroundColor Yellow
+            Write-Host "      (Should match your SharePoint URL, e.g., 'contoso' for contoso.sharepoint.com)" -ForegroundColor Yellow
+            Write-Host "   2. Ensure your account has SharePoint Administrator role" -ForegroundColor Yellow
+            Write-Host "   3. Check if conditional access policies are blocking connection" -ForegroundColor Yellow
+            Write-Host "   4. Try running: Connect-SPOService -Url $adminUrl" -ForegroundColor Yellow
+            Write-Host "      manually to test authentication" -ForegroundColor Yellow
+            Write-Host "   5. Or rerun with: -SkipSharePoint to skip SharePoint collection" -ForegroundColor Yellow
+        }
+        elseif ($_.Exception.Message -like "*not found*" -or $_.Exception.Message -like "*404*") {
+            Write-Host "" -ForegroundColor Yellow
+            Write-Host "   Troubleshooting - URL Not Found:" -ForegroundColor Yellow
+            Write-Host "   The tenant domain '$TenantDomain' may be incorrect" -ForegroundColor Yellow
+            Write-Host "   To find your SharePoint admin URL:" -ForegroundColor Yellow
+            Write-Host "   1. Go to admin.microsoft.com" -ForegroundColor Yellow
+            Write-Host "   2. Navigate to SharePoint admin center" -ForegroundColor Yellow
+            Write-Host "   3. Note the URL format: https://YOURTENANT-admin.sharepoint.com" -ForegroundColor Yellow
+            Write-Host "   4. Rerun script with: -TenantDomain 'YOURTENANT'" -ForegroundColor Yellow
+        }
+        
+        Write-Host "" -ForegroundColor Yellow
+        Write-Host "   Continuing with Exchange data only..." -ForegroundColor Yellow
+    }
 }
 
 # Helper function for size conversion
