@@ -88,6 +88,71 @@ foreach ($user in $offboardedUsers) {
 
 ---
 
+### Sync-ContactsFromCsv.ps1
+Synchronizes contact information from a CSV file to users' contact folders in Microsoft Graph. Retrieve users from security groups, populate contact folders with phone numbers, names, and company information, with optional deletion of contacts not in the source CSV.
+
+**Quick Start:**
+```powershell
+# Sync all Sales team members' contacts from CSV
+.\Sync-ContactsFromCsv.ps1 `
+    -CsvPath "C:\contacts.csv" `
+    -FolderName "Contacts" `
+    -SecurityGroup "Sales Team"
+
+# Include name updates and delete outdated contacts
+.\Sync-ContactsFromCsv.ps1 `
+    -CsvPath "C:\contacts.csv" `
+    -FolderName "Shared Contacts" `
+    -SecurityGroup "Sales Team" `
+    -UpdateNames `
+    -DeleteNotInCsv
+
+# Preview changes without executing
+.\Sync-ContactsFromCsv.ps1 `
+    -CsvPath "C:\contacts.csv" `
+    -FolderName "Contacts" `
+    -SecurityGroup "Sales Team" `
+    -WhatIf
+```
+
+**Use Cases:**
+- Maintain consistent contact directories for departments or teams
+- Sync sales contact lists to team mailboxes
+- Automated contact folder management during reorganizations
+- Central contact repository distribution to multiple users
+- Bulk phone number updates across contact folders
+
+**Features:**
+- Retrieve target users from Entra security groups, CSV, or direct list
+- Phone number normalization (auto-strips formatting)
+- Selective updates (phone numbers only, or including names/company/titles)
+- Contact cleanup with optional deletion of outdated contacts
+- Parallel processing for fast bulk operations
+- Comprehensive logging and execution statistics
+- WhatIf support for previewing changes
+
+**Parameters:**
+- `CsvPath` - Source CSV with canonical contact data
+- `FolderName` - Target contact folder name
+- `-SecurityGroup` - Entra security group (retrieves members)
+- `-Users` - Direct list of user UPNs
+- `-UsersCsvPath` - CSV file with UPN column
+- `-UpdateNames` - Include name/company/job title updates
+- `-DeleteNotInCsv` - Remove contacts not in source CSV
+- `-DegreeOfParallelism` - Concurrent user processing threads (1-16, default: 4)
+
+**Output:**
+- Real-time console feedback with color-coded status messages
+- Per-user creation/update/delete counts
+- Summary statistics on completion
+
+**See Also:**
+- [[Sync-ContactsFromCsv|Detailed Documentation]] (wiki)
+- [CSV Template](templates/ContactList_Template.csv)
+- [CSV Format Guide](.prep/ContactList_Format.md)
+
+---
+
 ## 🚀 Prerequisites
 
 ### PowerShell Requirements
@@ -112,6 +177,18 @@ Install-Module Microsoft.Graph.Files -Scope CurrentUser
 Install-Module Microsoft.Graph.Sites -Scope CurrentUser
 ```
 
+**For Sync-ContactsFromCsv.ps1:**
+- **Microsoft.Graph.Authentication** (required)
+- **Microsoft.Graph.Users** (required)
+- **Microsoft.Graph.Groups** (required for security group member retrieval)
+
+```powershell
+# Install Microsoft Graph modules
+Install-Module Microsoft.Graph.Authentication -Scope CurrentUser
+Install-Module Microsoft.Graph.Users -Scope CurrentUser
+Install-Module Microsoft.Graph.Groups -Scope CurrentUser
+```
+
 **For Remove-OrganizedMeetings.ps1:**
 - **ExchangeOnlineManagement**
 
@@ -125,6 +202,10 @@ Install-Module ExchangeOnlineManagement -Scope CurrentUser
 - Microsoft Graph: `User.ReadWrite.All`
 - For OneDrive: `Files.ReadWrite.All`, `Sites.ReadWrite.All`
 - For AD: Account creation rights in target OU
+
+**Sync-ContactsFromCsv.ps1:**
+- Microsoft Graph: `Contacts.ReadWrite`, `User.Read.All`, `Group.Read.All`
+- (Contact folder must be accessible to the authenticated user)
 
 **Remove-OrganizedMeetings.ps1:**
 - Exchange Online: Exchange Administrator or Global Administrator

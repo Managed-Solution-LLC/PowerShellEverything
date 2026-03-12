@@ -1,0 +1,6 @@
+Email,GivenName,Surname,Company,JobTitle,BusinessPhones,MobilePhone
+john.smith@contoso.com,John,Smith,Contoso,Sales Manager,(555) 123-4567; (555) 987-1234,(555) 555-1234
+jane.doe@contoso.com,Jane,Doe,Contoso,Marketing Director,(555) 234-5678,(555) 555-5678
+robert.johnson@contoso.com,Robert,Johnson,Contoso,IT Director,(555) 345-6789; (555) 111-2222,(555) 555-9012
+sarah.williams@contoso.com,Sarah,Williams,Contoso,HR Manager,(555) 456-7890,(555) 555-3456
+michael.brown@contoso.com,Michael,Brown,Contoso,Finance Lead,(555) 567-8901; (555) 222-3333,(555) 555-7890

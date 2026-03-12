@@ -682,12 +682,47 @@ Install-Module ModuleName -Scope CurrentUser
 6. **Update Root README**: Add entry to main `README.md` if new capability or major script
 7. **Update Category Guides**: Update relevant `docs/*.md` guides if applicable
 
+### GitHub Wiki Link Structure
+When documenting scripts, use proper link formats that work with GitHub's wiki workflow (files in `docs/wiki/` are synced to the repo's wiki):
+
+**Link Types:**
+
+1. **Wiki-to-Wiki Cross-References** (for future related script wiki pages):
+   ```markdown
+   [[New-Office365Accounts]] - Alternative format when wiki page is created
+   [[New-Office365Accounts|Display Text]] - With custom link text
+   ```
+
+2. **Links to Repository Files** (scripts, templates, format guides):
+   ```markdown
+   [Script Name](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/scripts/Path/To/Script.ps1)
+   [CSV Template](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/scripts/Office365/templates/ContactList_Template.csv)
+   [Format Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/scripts/Office365/.prep/ContactList_Format.md)
+   ```
+
+3. **External Documentation Links**:
+   ```markdown
+   [Microsoft Graph Contacts API](https://docs.microsoft.com/graph/api/resources/contact)
+   ```
+
+**Do NOT use:**
+- ❌ Relative paths like `../../templates/file.csv` (breaks in wiki)
+- ❌ `file://` or `vscode://` URI schemes
+- ❌ Path-only links like `../../../scripts/file.ps1` (not accessible from wiki)
+
+**Best Practice:**
+- Use full GitHub URLs (`https://github.com/...`) for any files in the main repository
+- Use wiki-style links (`[[PageName]]`) only for established wiki pages within the wiki repository
+- Include a note like "(wiki documentation coming soon)" for related scripts without wiki pages yet
+
 ### Documentation Validation Checklist
 Before considering script documentation complete:
 - [ ] Comment-based help includes all sections (SYNOPSIS, DESCRIPTION, PARAMETERS, EXAMPLES, NOTES, LINK)
 - [ ] Real dates used throughout (no placeholders)
 - [ ] All examples use generic organization names
 - [ ] Wiki documentation created in correct location (`docs/wiki/<CategoryPath>/<ScriptName>.md`)
+- [ ] **All file links use full GitHub URLs** (https://github.com/...), not relative paths
+- [ ] **Related script links use wiki syntax** `[[PageName]]` with "(coming soon)" notes if wiki page doesn't exist
 - [ ] Folder-level README.md updated or created in script's directory
 - [ ] Folder README links to wiki articles for all scripts
 - [ ] Prerequisites clearly documented with versions
