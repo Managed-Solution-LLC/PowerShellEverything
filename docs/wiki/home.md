@@ -24,7 +24,7 @@ Office 365 tenant assessment and reporting tools:
 - **[Get-MailboxRules](Get-MailboxRules)** - Export mailbox rules (forwarding, redirects, auto-replies)
 - **[Get-MigrationWizLicensing](Get-MigrationWizLicensing)** - BitTitan MigrationWiz license calculator
 
-### � Office 365 User Management
+### 🏢 Office 365 User Management
 
 User account creation and management automation:
 - **[New-Office365Accounts](Office365/New-Office365Accounts)** - Bulk user account creation with password generation
@@ -34,8 +34,30 @@ User account creation and management automation:
   - Cloud Shell optimized with persistent storage
   - Microsoft 365 or Active Directory support
   - Password export to secure timestamped CSV
+- **[Sync-ContactsFromCsv](Office365/Sync-ContactsFromCsv)** - Sync contact folders from CSV to Microsoft Graph mailboxes
+  - Retrieve users from Entra security groups
+  - Phone number normalization and update
+  - Optional name, company, and job title sync
+  - Contact cleanup with deletion support
+  - Parallel processing for large user sets
+- **[Set-EmailToSharedAccount](Office365/Set-EmailToSharedAccount)** - Convert Exchange Online mailboxes to Shared and remove all M365 licenses
+  - CSV, array, or single-identity input
+  - Detects already-shared mailboxes (non-fatal skip)
+  - `-SkipLicenseRemoval` for mailbox-only conversion
+  - WhatIf support and timestamped CSV results
+- **[Set-SMTPForward](Office365/Set-SMTPForward)** - Configure or clear SMTP forwarding on Exchange Online mailboxes in bulk
+  - Set, update, or clear `ForwardingSmtpAddress` per mailbox
+  - Control `DeliverToMailboxAndForward` per entry
+  - Optional `-AllowAutoForward` updates tenant outbound spam policy
+  - CSV, array, or single-identity input; WhatIf support
+- **[Invoke-UserSignOutAndBlock](Office365/Invoke-UserSignOutAndBlock)** - Block sign-in, revoke all sessions, and disable devices for M365 accounts
+  - Bulk operation via CSV, array, or single UPN
+  - Blocks sign-in (AccountEnabled = $false) and revokes all refresh tokens immediately
+  - Reports and optionally disables Entra ID-registered/joined devices
+  - WhatIf support for safe pre-run validation
+  - Designed for offboarding, incident response, and account compromise scenarios
 
-### �🖥️ On-Premise Infrastructure Assessments
+### 🖥️ On-Premise Infrastructure Assessments
 
 Active Directory and Windows Server assessment tools:
 - **[Get-ComprehensiveADReport](Get-ComprehensiveADReport)** - Complete Active Directory assessment for AD to AD migrations
@@ -83,8 +105,19 @@ Microsoft Intune device enrollment and management:
   - Automatic policy synchronization
   - Comprehensive enrollment validation
 
-### �🔧 Development Resources- **[Running Scripts from GitHub](Running-Scripts-from-GitHub)** - Execute PowerShell scripts directly from GitHub- **Code Standards** - PowerShell coding standards and best practices _(coming soon)_
-- **Graph Commands** - Microsoft Graph API helpers and utilities _(documentation pending)_
+### 🌐 Microsoft Graph API Helpers
+
+Reusable authentication, pagination, and reporting functions used across all scripts:
+- **[Get-GraphToken](Graph%20Commands/Get-GraphToken)** - Acquire OAuth2 access tokens via MSAL.PS (client secret or interactive)
+- **[Get-GraphHeaders](Graph%20Commands/Get-GraphHeaders)** - Build authorization header hashtables for REST API calls
+- **[Get-AzureResourcePaging](Graph%20Commands/Get-AzureResourcePaging)** - Automatically follow `@odata.nextLink` across all result pages
+- **[Get-EnterpriseAppUsage](Graph%20Commands/Get-EnterpriseAppUsage)** - Report sign-in usage and ownership of all app registrations
+- **[Get-ExchangeErrorsGraph](Graph%20Commands/Get-ExchangeErrorsGraph)** - Surface Exchange Online provisioning errors via Graph beta endpoint
+- **[Get-PBIWorkspaceUsageReport](Graph%20Commands/Get-PBIWorkspaceUsageReport)** - Power BI workspace and report usage across all workspaces
+
+### 🔧 Development Resources
+- **[Running Scripts from GitHub](Running-Scripts-from-GitHub)** - Execute PowerShell scripts directly from GitHub
+- **Code Standards** - PowerShell coding standards and best practices _(coming soon)_
 
 ## 🎯 Featured Scripts
 
@@ -104,6 +137,36 @@ $users = @(
 ```
 
 [View Documentation →](Office365/New-Office365Accounts)
+
+### Sync-ContactsFromCsv.ps1
+Synchronizes contact information from a CSV file into users' Microsoft Graph contact folders. Pull target users from an Entra security group, sync phone numbers and contact details, and optionally delete contacts not in the source list.
+
+**Quick Start:**
+```powershell
+# Sync contacts for all members of a security group
+.\Sync-ContactsFromCsv.ps1 `
+    -CsvPath "C:\contacts.csv" `
+    -FolderName "Shared Contacts" `
+    -SecurityGroup "Sales Team" `
+    -UpdateNames -DeleteNotInCsv
+```
+
+[View Documentation →](Office365/Sync-ContactsFromCsv)
+
+### Get-PBIWorkspaceUsageReport.ps1
+Comprehensive Power BI workspace usage report covering all shared and personal workspaces. Correlates report inventory with Activity Log data for up to 90 days, surfacing view counts, unique users, and stale reports.
+
+**Quick Start:**
+```powershell
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "<tenant-id>" `
+    -ClientId "<client-id>" `
+    -ClientSecret "<secret>" `
+    -OutputPath "C:\Reports\PBI" `
+    -OutputFormat "csv"
+```
+
+[View Documentation →](Graph%20Commands/Get-PBIWorkspaceUsageReport)
 
 ### Get-QuickO365Report.ps1
 Complete Office 365 tenant assessment collecting mailboxes, licenses, OneDrive, SharePoint, Groups, Teams, and permissions. Generates professional Excel workbook with formatted tables.

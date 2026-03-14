@@ -61,6 +61,68 @@ $users = @(
 
 ---
 
+### Invoke-UserSignOutAndBlock.ps1
+Blocks sign-in, revokes all active sessions and refresh tokens, and optionally disables Entra ID-registered devices for one or more Microsoft 365 / Entra ID accounts. Designed for offboarding, incident response, and account compromise scenarios.
+
+**Quick Start:**
+```powershell
+# Single account - block sign-in and revoke sessions
+.\Invoke-UserSignOutAndBlock.ps1 -Identity "jdoe@contoso.com"
+
+# Single account - also disable all Entra ID-joined devices
+.\Invoke-UserSignOutAndBlock.ps1 -Identity "jdoe@contoso.com" -DisableDevices
+
+# Bulk from CSV
+.\Invoke-UserSignOutAndBlock.ps1 -CsvPath "C:\Data\offboard.csv" -DisableDevices
+
+# From array
+$accounts = @(
+    [PSCustomObject]@{ Identity = "jdoe@contoso.com";   Reason = "Offboarding" }
+    [PSCustomObject]@{ Identity = "jsmith@contoso.com"; Reason = "Account compromise" }
+)
+.\Invoke-UserSignOutAndBlock.ps1 -UserArray $accounts -DisableDevices
+
+# Preview without making changes
+.\Invoke-UserSignOutAndBlock.ps1 -CsvPath "C:\Data\offboard.csv" -WhatIf
+```
+
+**Use Cases:**
+- Employee offboarding — immediately cut access across all sessions and devices
+- Account compromise response — revoke attacker sessions while investigation proceeds
+- Bulk tenant decommissioning — lock all accounts before domain removal
+
+**Features:**
+- Blocks sign-in (AccountEnabled = $false)
+- Revokes all refresh tokens and active sessions via Microsoft Graph
+- Reports all Entra ID-registered/joined devices per account
+- Optional device disablement (`-DisableDevices`)
+- CSV file, array, or single-identity input
+- WhatIf support for pre-run validation
+- Timestamped CSV results report
+
+**Parameters:**
+- `CsvPath` - Path to CSV file (required column: `Identity`; optional: `Reason`)
+- `UserArray` - Array of PSCustomObjects with `Identity` (and optionally `Reason`) properties
+- `Identity` - Single UPN or Entra Object ID
+- `DisableDevices` - Also disable all Entra ID-registered devices owned by the account
+- `SkipBlockSignIn` - Revoke sessions only; do not set AccountEnabled = $false
+- `SkipRevokeSession` - Block sign-in only; do not revoke existing sessions
+- `OutputDirectory` - Results CSV location (default: `C:\Reports\CSV_Exports`)
+- `GenerateTemplate` - Create a blank CSV template and exit
+
+**Required Permissions (Microsoft Graph):**
+- `User.ReadWrite.All`
+- `Directory.ReadWrite.All`
+- `Device.ReadWrite.All`
+
+**Output:**
+- CSV file: `C:\Reports\CSV_Exports\UserSignOutAndBlock_Results_YYYYMMDD_HHmmss.csv`
+- Per-account status: SignInBlocked, SessionsRevoked, DevicesFound, DevicesDisabled
+
+**Note:** This script does **not** wipe or retire managed devices from Intune. Use the Intune portal or dedicated scripts for remote wipe.
+
+---
+
 ### Remove-OrganizedMeetings.ps1
 Cancels all organized meetings for offboarded users to clean up calendars and send cancellation notices.
 

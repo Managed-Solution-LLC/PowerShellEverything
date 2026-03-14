@@ -174,7 +174,9 @@ if ($msolConnected) {
         foreach ($user in $msolUsers) {
             $licenseNames = @()
             foreach ($license in $user.Licenses) {
-                $licenseNames += $license.AccountSkuId -replace '^.*:', ''
+                if ($license.AccountSkuId) {
+                    $licenseNames += ($license.AccountSkuId -replace '^.*:', '')
+                }
             }
             if ($licenseNames.Count -gt 0) {
                 $userLicenses[$user.UserPrincipalName] = $licenseNames -join '; '
@@ -301,7 +303,7 @@ try {
         Write-Progress -Activity "Collecting Mailboxes" -Status "$($mb.DisplayName)" -PercentComplete (($i/$mailboxes.Count)*100)
         
         try {
-            $stats = Get-EXOMailboxStatistics -Identity $mb.UserPrincipalName -ErrorAction Stop -WarningAction SilentlyContinue
+            $stats = Get-EXOMailboxStatistics -Identity $mb.UserPrincipalName -Properties LastUserActionTime,LastLogonTime -ErrorAction Stop -WarningAction SilentlyContinue
             
             # Parse sizes
             $totalGB = 0
@@ -373,7 +375,7 @@ try {
                 EmailAddress = $mb.PrimarySmtpAddress
                 MailboxType = $mb.RecipientTypeDetails
                 Licenses = $licenses
-                LastUserActionTime = $stats.LastUserActionTime
+                LastUserActionTime = if ($stats.LastUserActionTime) { $stats.LastUserActionTime } elseif ($stats.LastLogonTime) { $stats.LastLogonTime } else { "Never" }
                 TotalSizeGB = $totalGB
                 DeletedItemsSizeGB = $deletedSizeGB
                 ItemCount = $stats.ItemCount
@@ -924,4 +926,27 @@ Write-Host ""
 Write-Host "Execution time: $(((Get-Date) - $StartTime).ToString('mm\:ss'))" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host $summary
+    Write-Host ""
+    Write-Host "[INFO] Collecting license information..." -ForegroundColor Cyan
+    try {
+        $msolUsers = Get-MsolUser -All -ErrorAction Stop
+        Write-Host "   Found $($msolUsers.Count) users" -ForegroundColor Yellow
+        foreach ($user in $msolUsers) {
+            $licenseNames = @()
+            foreach ($license in $user.Licenses) {
+                if ($license.AccountSkuId) {
+                    $licenseNames += $license.AccountSkuId
+                }
+            }
+            if ($licenseNames.Count -gt 0) {
+                $userLicenses[$user.UserPrincipalName] = $licenseNames -join '; '
+            } else {
+                $userLicenses[$user.UserPrincipalName] = "No License"
+            }
+        }
+        Write-Host "[OK] Collected license data for $($userLicenses.Count) users" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[WARNING] Error collecting licenses: $($_.Exception.Message)" -ForegroundColor Yellow
+        $msolConnected = $false
+    }

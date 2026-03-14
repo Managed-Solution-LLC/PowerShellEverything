@@ -26,6 +26,10 @@
 
 ### Office 365 Management
 - [New-Office365Accounts](Office365/New-Office365Accounts)
+- [Sync-ContactsFromCsv](Office365/Sync-ContactsFromCsv)
+- [Set-EmailToSharedAccount](Office365/Set-EmailToSharedAccount)
+- [Set-SMTPForward](Office365/Set-SMTPForward)
+- [Invoke-UserSignOutAndBlock](Office365/Invoke-UserSignOutAndBlock)
 
 ### On-Premise Infrastructure
 - [Get-ComprehensiveADReport](Get-ComprehensiveADReport)
@@ -57,7 +61,12 @@
 - Azure Automation _(documentation pending)_
 
 ### Graph Commands
-- Microsoft Graph Helpers _(documentation pending)_
+- [Get-GraphToken](Graph%20Commands/Get-GraphToken)
+- [Get-GraphHeaders](Graph%20Commands/Get-GraphHeaders)
+- [Get-AzureResourcePaging](Graph%20Commands/Get-AzureResourcePaging)
+- [Get-EnterpriseAppUsage](Graph%20Commands/Get-EnterpriseAppUsage)
+- [Get-ExchangeErrorsGraph](Graph%20Commands/Get-ExchangeErrorsGraph)
+- [Get-PBIWorkspaceUsageReport](Graph%20Commands/Get-PBIWorkspaceUsageReport)
 
 ### Intune
 - Intune Management _(documentation pending)_
