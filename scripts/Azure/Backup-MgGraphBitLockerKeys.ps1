@@ -80,4 +80,4 @@ foreach ($device in $devices) {
     }
 }
 
-$AllKeys | Export-Csv -Path "C:\temp\BitLockerKeys.csv" -NoTypeInformation
+$allBitlockerKeys | Export-Csv -Path "C:\temp\BitLockerKeys.csv" -NoTypeInformation
