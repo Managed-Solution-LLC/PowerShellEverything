@@ -2,7 +2,7 @@
 
 ## Overview
 
-`Get-PBIWorkspaceUsageReport.ps1` generates a comprehensive Power BI workspace and report usage report. It inventories all reports across all workspaces (including personal workspaces), correlates them with Power BI Activity Log data for up to 90 days, and produces a detailed usage analysis showing view counts and unique users per report. Outputs in CSV or JSON format.
+`Get-PBIWorkspaceUsageReport.ps1` generates a comprehensive Power BI workspace and report usage report. It inventories all reports across all workspaces (including personal workspaces), correlates them with Power BI Activity Log data for the last 30 days by default (up to 90 days for Fabric/Premium capacities), and produces a detailed usage analysis showing view counts and unique users per report. Supports both Service Principal and interactive user authentication. Outputs in CSV or JSON format.
 
 ## Features
 
@@ -13,7 +13,7 @@
 - **Stale Report Identification** - Reports with zero views are surfaced for potential cleanup
 - **CSV and JSON Export** - Choose output format; JSON uses proper arrays for user lists
 - **Pre-Flight Validation** - Validates PowerShell version, output directory, and write permissions before starting
-- **Service Principal Auth** - Uses app registration with Power BI Admin APIs
+- **Dual Authentication Modes** - Service Principal (client credentials) for automated/pipeline use, or interactive browser login via `-UseInteractiveAuth` for ad-hoc runs
 
 ## Prerequisites
 
@@ -21,19 +21,54 @@
 - **PowerShell 5.1 or later** (validated at runtime)
 
 ### Required Permissions
-The service principal must be authorized for Power BI Admin APIs. One of:
-- `Tenant.Read.All` permission in Power BI Service  
-- `Tenant.ReadWrite.All` permission in Power BI Service
 
-**AND** one of the following tenant-level configurations:
-- Service principal added to the **Power BI Service Admins** security group
-- Tenant setting **"Allow service principals to use Power BI admin APIs"** enabled in Power BI Admin Portal
+The script calls Power BI `/admin/` endpoints. Three things must all be in place:
 
-### Azure App Registration Setup
-1. Register an App in Azure AD / Entra ID
+#### 1. Entra App Registration Permissions
+Add the following API permissions to the app registration in [Entra ID](https://entra.microsoft.com) and grant admin consent:
+
+| API | Permission | Type |
+|-----|-----------|------|
+| Power BI Service | `Tenant.Read.All` | Application |
+
+#### 2. Fabric Admin RBAC Role (required to access Admin Portal settings)
+The person configuring the Fabric tenant settings must hold the **Fabric Administrator** (or Global Administrator) role in Entra ID.
+
+> Without this role, the [Fabric Admin Portal](https://app.powerbi.com/admin-portal/tenantSettings) tenant settings will not be accessible or editable.
+
+To assign the role:  
+**Entra ID → Roles and administrators → Fabric Administrator → Add assignment**
+
+#### 3. Fabric Admin Portal — Admin API Settings
+Once you have the Fabric Administrator role, navigate to:
+
+**[https://app.powerbi.com/admin-portal/tenantSettings](https://app.powerbi.com/admin-portal/tenantSettings)**
+
+Scroll to the **Admin API settings** section and configure:
+
+- **Setting:** "Service principals can access read-only admin APIs"
+- **Toggle:** Enabled
+- **Apply to:** Specific security groups
+- **Action:** Add the security group that contains your app registration's service principal
+
+> ⚠️ **Common confusion:** "Service principals can call Fabric public APIs" (under Developer settings) is a **different setting** that covers regular endpoints only. The `/admin/` endpoints used by this script require the **Admin API settings** toggle above.
+
+### Azure App Registration Setup (Service Principal auth)
+1. Register an App in Entra ID
 2. Create a client secret
-3. Add the service principal to the Power BI Service Admin group OR enable the tenant setting
-4. No Graph API permissions needed — only Power BI REST API access
+3. Grant `Tenant.Read.All` (Power BI Service) with admin consent
+4. Add the service principal to the security group allowed in the Admin API settings above
+5. No Microsoft Graph API permissions are needed — only Power BI REST API access
+
+### Interactive Authentication (`-UseInteractiveAuth`)
+Use this for ad-hoc runs or while Service Principal permissions are still propagating.
+
+**Requirements:**
+- The `MicrosoftPowerBIMgmt` PowerShell module: `Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser`
+- Sign in with a **Power BI Administrator** or **Fabric Administrator** account
+- `TenantId` is still required; `ClientId` and `ClientSecret` are not used
+
+> ℹ️ The same Admin API settings (above) apply — the signed-in user account must have Power BI Admin access to the tenant.
 
 ### Output Directory
 - Write permissions to the `OutputPath` directory (validated at runtime)
@@ -47,13 +82,18 @@ The service principal must be authorized for Power BI Admin APIs. One of:
 
 ### ClientId
 **Type:** String  
-**Required:** Yes  
-**Description:** App Registration (Service Principal) Client ID.
+**Required:** Yes *(Service Principal auth only)*  
+**Description:** App Registration (Service Principal) Client ID. Not used when `-UseInteractiveAuth` is specified.
 
 ### ClientSecret
 **Type:** String  
-**Required:** Yes  
-**Description:** App Registration Client Secret. For production use, retrieve from Azure Key Vault rather than hardcoding.
+**Required:** Yes *(Service Principal auth only)*  
+**Description:** App Registration Client Secret. For production use, retrieve from Azure Key Vault rather than hardcoding. Not used when `-UseInteractiveAuth` is specified.
+
+### UseInteractiveAuth
+**Type:** Switch  
+**Required:** No  
+**Description:** Use interactive browser login instead of a service principal client secret. Requires the `MicrosoftPowerBIMgmt` module. When specified, `ClientId` and `ClientSecret` are not needed. `TenantId` is still required.
 
 ### OutputPath
 **Type:** String  
@@ -71,13 +111,23 @@ The service principal must be authorized for Power BI Admin APIs. One of:
 ### ActivityDays
 **Type:** Integer  
 **Required:** No  
-**Default:** `90`  
+**Default:** `30`  
 **Valid Range:** 1–90  
-**Description:** Number of days of Power BI activity history to retrieve. Maximum is 90 (Power BI API limitation).
+**Description:** Number of days of Power BI activity history to retrieve. Standard Power BI audit log retains **30 days**; tenants with Fabric or Premium capacity may retain up to 90 days. Requesting dates outside the tenant's retention window returns a 400 error (skipped automatically per day).
 
 ## Usage Examples
 
-### Example 1: Basic Report (CSV, Current Directory)
+### Example 1: Interactive Auth (Recommended for Ad-Hoc Use)
+```powershell
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "12345678-1234-1234-1234-123456789012" `
+    -UseInteractiveAuth `
+    -OutputPath "C:\Reports\PBI" `
+    -OutputFormat "json"
+```
+Opens a browser login prompt. Use a Power BI Administrator account. No app registration needed.
+
+### Example 2: Service Principal (Automated / Pipeline Use)
 ```powershell
 .\Get-PBIWorkspaceUsageReport.ps1 `
     -TenantId "12345678-1234-1234-1234-123456789012" `
@@ -85,39 +135,28 @@ The service principal must be authorized for Power BI Admin APIs. One of:
     -ClientSecret "your-client-secret"
 ```
 
-### Example 2: Custom Output Path and Format
+### Example 3: Extended Window (Fabric/Premium Tenants)
 ```powershell
 .\Get-PBIWorkspaceUsageReport.ps1 `
     -TenantId "12345678-1234-1234-1234-123456789012" `
-    -ClientId "abcdefab-1234-1234-1234-abcdefabcdef" `
-    -ClientSecret "your-client-secret" `
+    -UseInteractiveAuth `
     -OutputPath "C:\Reports\PowerBI" `
-    -OutputFormat "json"
+    -ActivityDays 90
 ```
-
-### Example 3: 60-Day Lookback with CSV Export
-```powershell
-.\Get-PBIWorkspaceUsageReport.ps1 `
-    -TenantId "12345678-1234-1234-1234-123456789012" `
-    -ClientId "abcdefab-1234-1234-1234-abcdefabcdef" `
-    -ClientSecret "your-client-secret" `
-    -OutputPath "C:\Reports\PowerBI" `
-    -ActivityDays 60
-```
+> ⚠️ Only use `-ActivityDays` values above 30 if the tenant has Fabric or Premium capacity with extended audit retention. Standard tenants will see per-day failures for dates beyond 30 days (skipped automatically).
 
 ### Example 4: Identify Stale Reports
 ```powershell
 # Run report
 .\Get-PBIWorkspaceUsageReport.ps1 `
     -TenantId "12345678-1234-1234-1234-123456789012" `
-    -ClientId "<client-id>" `
-    -ClientSecret "<secret>" `
+    -UseInteractiveAuth `
     -OutputPath "C:\Reports\PowerBI"
 
 # Filter stale reports from the usage CSV
-$usage = Import-Csv "C:\Reports\PowerBI\PBI_Report_Usage_*.csv" | Select-Object -First 1
+$usage = Import-Csv "C:\Reports\PowerBI\PBI_Report_Usage_*.csv"
 $stale = $usage | Where-Object { [int]$_.TotalViews_90d -eq 0 }
-Write-Host "Stale reports (0 views): $($stale.Count)"
+Write-Host "Stale reports (0 views in last 30 days): $($stale.Count)"
 $stale | Select-Object ReportName, WorkspaceName, WorkspaceType | Format-Table
 ```
 
@@ -145,8 +184,11 @@ Per-report usage aggregation sorted by most-viewed.
 | ReportName | Display name of the report |
 | WorkspaceName | Workspace containing the report |
 | WorkspaceType | `Shared` or `Personal` |
-| TotalViews_90d | Total view events in the period |
+| TotalViews_90d | Total ViewReport events in the activity window |
 | UniqueUsers_90d | Count of distinct users who viewed |
+| UserList_90d | Semicolon-delimited list of user IDs (CSV) or JSON array (JSON format) |
+| DatasetId | Power BI Dataset GUID backing the report |
+| ReportWebUrl | Direct URL to open the report in Power BI Service |
 
 ### User Details (`PBI_Report_UserDetails_<timestamp>.<ext>`)
 Per-user, per-report view counts.
@@ -155,8 +197,11 @@ Per-user, per-report view counts.
 |--------|-------------|
 | ReportId | Power BI Report GUID |
 | ReportName | Display name of the report |
-| UserId | Azure AD User Object ID or UPN |
+| UserId | Azure AD User UPN or Object ID |
 | ViewCount_90d | Number of times this user viewed the report |
+| LastViewed | Timestamp of the user's most recent view event |
+| WorkspaceName | Workspace containing the report |
+| WorkspaceType | `Shared` or `Personal` |
 
 ### Summary Text (`PBI_Usage_Summary_<timestamp>.txt`)
 Human-readable summary including:
@@ -186,25 +231,39 @@ Human-readable summary including:
 ## Common Issues & Troubleshooting
 
 ### Issue: "Unauthorized" / 401 on Power BI API
-**Causes:**
-- Service principal not added to Power BI Service Admin group
-- Tenant setting "Allow service principals to use Power BI admin APIs" not enabled
+**Root Cause:**  
+The script calls `/admin/` endpoints. `Tenant.Read.All` being granted and the "Service principals can call Fabric public APIs" setting being enabled is **not sufficient** — the Admin API setting is controlled by a separate toggle.
 
-**Solutions:**
-1. Add the service principal to the **Power BI Administrator** role in Azure AD
-2. Or, in Power BI Admin Portal → Tenant settings → Enable "Allow service principals to use Power BI admin APIs" and add the security group containing your SP
+**Resolution steps:**
+
+**Step 1 — Verify you have Fabric Admin access to configure tenant settings:**  
+The person making changes must hold the **Fabric Administrator** (or Global Administrator) role.  
+> Entra ID → Roles and administrators → Fabric Administrator → Add assignment
+
+**Step 2 — Enable Admin API access in the Fabric Admin Portal:**  
+Navigate to: **[https://app.powerbi.com/admin-portal/tenantSettings](https://app.powerbi.com/admin-portal/tenantSettings)**  
+
+Scroll to **Admin API settings** and configure:
+- Enable: **"Service principals can access read-only admin APIs"**
+- Set **Apply to:** Specific security groups
+- Add the security group containing your app registration's service principal
+
+> ⚠️ **Common confusion:** "Service principals can call Fabric public APIs" (Developer settings) covers regular/public endpoints only — it does **not** grant access to `/admin/` endpoints used by this script.
 
 ### Issue: No workspaces returned
 **Cause:** Insufficient Power BI admin permissions.
 
 **Solution:** Verify the service principal has `Tenant.Read.All` in Power BI and admin API access is enabled.
 
-### Issue: Activity log returns empty results
-**Cause:**
-- Activity logs only retain 90 days of data
+### Issue: Activity log returns empty results or per-day failures
+**Cause:**  
+- Standard Power BI audit log retains only **30 days** of data. Requesting dates older than 30 days returns 400 errors (the script skips those days automatically and reports a count at the end)
 - Tenant may have activity logging disabled
 
-**Solution:** Verify Power BI activity logging is enabled in the Power BI Admin Portal.
+**Solution:**  
+- Use the default `ActivityDays 30` or explicitly pass `-ActivityDays 30` for standard tenants
+- Only use higher values (up to 90) if the tenant has **Fabric or Premium capacity** with extended retention
+- Verify Power BI activity logging is enabled in the Power BI Admin Portal
 
 ### Issue: Pre-flight validation fails (PowerShell version)
 **Cause:** Running on PowerShell 5.0 or earlier.
@@ -239,6 +298,7 @@ $PSVersionTable.PSVersion
 
 - **v1.0** - Initial release - Core inventory and usage correlation
 - **v1.1** (2026-03-12) - Added pre-flight validation, improved error handling and authentication, Export-Data with verbose logging, and wrapped main auth in try/catch
+- **v1.2.0** (2026-03-20) - Added `-UseInteractiveAuth` switch for interactive login via `MicrosoftPowerBIMgmt` module; switched activity event collection to `Get-PowerBIActivityEvent` cmdlet with client-side `ViewReport` filtering; changed default `ActivityDays` from 90 to 30 to match standard Power BI audit retention
 
 ## See Also
 

@@ -18,9 +18,10 @@
 
     Authentication:
       - Service Principal (App Registration) with Power BI Admin APIs enabled
-      - Requires: Tenant.Read.All, Tenant.ReadWrite.All (Power BI Service)
-        OR the SP must be added to the "Power BI Service Admins" security group
-        and the tenant setting "Allow service principals to use Power BI admin APIs" enabled.
+        Requires: Tenant.Read.All or Tenant.ReadWrite.All (Power BI Service)
+        AND the Fabric Admin Portal tenant setting 'Service principals can access read-only admin APIs' enabled.
+      - Interactive user login via -UseInteractiveAuth (requires MicrosoftPowerBIMgmt module)
+        Use this when the SP is still pending permission propagation or for ad-hoc runs.
 
 .PARAMETER TenantId
     Azure AD / Entra ID Tenant ID.
@@ -41,6 +42,12 @@
 .PARAMETER ActivityDays
     Number of days of activity history to pull (max 90). Defaults to 90.
 
+.PARAMETER UseInteractiveAuth
+    Use interactive browser login instead of a service principal client secret.
+    Requires the MicrosoftPowerBIMgmt module. TenantId is still required;
+    ClientId and ClientSecret are not used when this switch is set.
+    Use this for ad-hoc runs or while SP permissions are still propagating.
+
 .EXAMPLE
     .\Get-PBIWorkspaceUsageReport.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
         -ClientId "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" `
@@ -52,15 +59,23 @@
         -ClientSecret "your-secret-here" `
         -OutputPath "C:\Reports\PBI" -OutputFormat "json" -ActivityDays 60
 
+.EXAMPLE
+    .\Get-PBIWorkspaceUsageReport.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+        -UseInteractiveAuth `
+        -OutputPath "C:\Reports\PBI" -OutputFormat "json" -ActivityDays 60
+
 .NOTES
     Author  : Managed Solution - Will Ford
-    Version : 1.1.0
-    Date    : 2026-03-12
+    Version : 1.2.0
+    Date    : 2026-03-20
 
     Requirements:
     - PowerShell 5.1 or later
-    - Service Principal with Power BI Admin API access
+    - Service Principal with Power BI Admin API access (or -UseInteractiveAuth with admin account)
     - Write access to the OutputPath directory
+
+    Updates in v1.2.0:
+    - Added -UseInteractiveAuth switch for interactive login via MicrosoftPowerBIMgmt module
 
     Updates in v1.1.0:
     - Added pre-flight validation (PowerShell version, directory permissions, parameter values)
@@ -69,19 +84,22 @@
     - Wrapped main authentication in try/catch with clean exit
 #>
 
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'ServicePrincipal')]
 param(
     [Parameter(Mandatory = $true, HelpMessage = "Azure AD / Entra ID Tenant ID")]
     [ValidateNotNullOrEmpty()]
     [string]$TenantId,
 
-    [Parameter(Mandatory = $true, HelpMessage = "App Registration (Service Principal) Client ID")]
+    [Parameter(Mandatory = $true, ParameterSetName = 'ServicePrincipal', HelpMessage = "App Registration (Service Principal) Client ID")]
     [ValidateNotNullOrEmpty()]
     [string]$ClientId,
 
-    [Parameter(Mandatory = $true, HelpMessage = "App Registration Client Secret")]
+    [Parameter(Mandatory = $true, ParameterSetName = 'ServicePrincipal', HelpMessage = "App Registration Client Secret")]
     [ValidateNotNullOrEmpty()]
     [string]$ClientSecret,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'Interactive', HelpMessage = "Use interactive browser login instead of a service principal")]
+    [switch]$UseInteractiveAuth,
 
     [Parameter(Mandatory = $false, HelpMessage = "Directory to write output files")]
     [string]$OutputPath = ".",
@@ -90,9 +108,9 @@ param(
     [ValidateSet("csv", "json")]
     [string]$OutputFormat = "csv",
 
-    [Parameter(Mandatory = $false, HelpMessage = "Number of days of activity history to pull (max 90)")]
+    [Parameter(Mandatory = $false, HelpMessage = "Number of days of activity history to pull. Standard Power BI audit log retains 30 days; Fabric/Premium may retain up to 90.")]
     [ValidateRange(1, 90)]
-    [int]$ActivityDays = 90
+    [int]$ActivityDays = 30
 )
 
 # ------------------------------------------------------------------------------
@@ -150,8 +168,51 @@ $userDetailOutPath = Join-Path $OutputPath "PBI_Report_UserDetails_$timestamp.$e
 $summaryPath       = Join-Path $OutputPath "PBI_Usage_Summary_$timestamp.txt"
 
 # ------------------------------------------------------------------------------
+# INTERACTIVE AUTH MODULE CHECK
+# ------------------------------------------------------------------------------
+
+if ($UseInteractiveAuth) {
+    if (-not (Get-Module -Name MicrosoftPowerBIMgmt -ListAvailable)) {
+        Write-Host "❌ MicrosoftPowerBIMgmt module is required for -UseInteractiveAuth." -ForegroundColor Red
+        Write-Host "   Install with: Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser" -ForegroundColor Yellow
+        exit 1
+    }
+    Import-Module MicrosoftPowerBIMgmt -ErrorAction Stop
+}
+
+# ------------------------------------------------------------------------------
 # FUNCTIONS
 # ------------------------------------------------------------------------------
+
+function Get-PBIAccessTokenInteractive {
+    <#
+    .SYNOPSIS
+        Returns a bearer token using MicrosoftPowerBIMgmt interactive login.
+        Reuses an existing session if one is already active; only prompts if needed.
+    #>
+    Write-Host "[AUTH] Checking for existing Power BI session..." -ForegroundColor Cyan
+    try {
+        $existing = Get-PowerBIAccessToken -ErrorAction SilentlyContinue
+        if ($existing -and $existing.Authorization) {
+            Write-Host "[AUTH] Reusing existing Power BI session." -ForegroundColor Green
+            return $existing.Authorization -replace '^Bearer ', ''
+        }
+    }
+    catch { <# no active session — fall through to login #> }
+
+    Write-Host "[AUTH] No active session found. Launching interactive login (browser window will open)..." -ForegroundColor Cyan
+    try {
+        Login-PowerBI -ErrorAction Stop | Out-Null
+        $token = (Get-PowerBIAccessToken).Authorization
+        if (-not $token) { throw "Get-PowerBIAccessToken returned empty token." }
+        Write-Host "[AUTH] Interactive login successful." -ForegroundColor Green
+        return $token -replace '^Bearer ', ''
+    }
+    catch {
+        Write-Host "❌ [AUTH] Interactive login failed: $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    }
+}
 
 function Get-PBIAccessToken {
     <#
@@ -221,6 +282,9 @@ function Invoke-PBIRestMethod {
         catch {
             $statusCode = $_.Exception.Response.StatusCode.value__
 
+            # Capture response body - ErrorDetails.Message is reliable for Invoke-RestMethod
+            $responseBody = $_.ErrorDetails.Message
+
             # Handle 429 (Too Many Requests) with retry
             if ($statusCode -eq 429) {
                 $retryAfter = 60
@@ -232,7 +296,32 @@ function Invoke-PBIRestMethod {
                 continue
             }
 
+            if ($statusCode -eq 401) {
+                Write-Host "❌ [API] 401 Unauthorized calling: $currentUri" -ForegroundColor Red
+                Write-Host ""
+                Write-Host "   Token was acquired successfully, but the Power BI Admin API (/admin/ endpoints) rejected the request." -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "   IMPORTANT DISTINCTION:" -ForegroundColor Cyan
+                Write-Host "   'Service principals can call Fabric public APIs' (Developer settings) covers regular/public endpoints." -ForegroundColor Cyan
+                Write-Host "   The /admin/ endpoints require a SEPARATE permission — 'Admin API settings'." -ForegroundColor Cyan
+                Write-Host ""
+                Write-Host "   To fix, choose ONE of the following:" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "   Option A (Recommended — fastest):" -ForegroundColor Green
+                Write-Host "     Assign the 'Fabric Administrator' Entra ID role to the Service Principal." -ForegroundColor Green
+                Write-Host "     Entra ID > Roles and administrators > Fabric Administrator > Add assignment" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "   Option B (Fabric Admin Portal):" -ForegroundColor Green
+                Write-Host "     Fabric Admin Portal > Tenant settings > Admin API settings" -ForegroundColor Green
+                Write-Host "     Enable: 'Service principals can access read-only admin APIs'" -ForegroundColor Green
+                Write-Host "     Scope:  Apply to the security group containing this Service Principal." -ForegroundColor Green
+                Write-Host ""
+                Write-Host "   Note: Entra app permissions (Tenant.Read.All) are necessary but not sufficient alone." -ForegroundColor Yellow
+                Write-Host "   The tenant-level Admin API gate above must also be satisfied." -ForegroundColor Yellow
+            }
+
             Write-Error "[API] Request failed ($statusCode): $_"
+            if ($responseBody) { Write-Host "   Response body: $responseBody" -ForegroundColor Yellow }
             throw
         }
 
@@ -283,6 +372,10 @@ function Get-ActivityEvents {
     .SYNOPSIS
         Pulls Power BI Activity Log events for a single day.
         The Activity Events API requires date-range queries scoped to a single UTC day.
+    .NOTES
+        When MicrosoftPowerBIMgmt is loaded (interactive auth), uses Get-PowerBIActivityEvent
+        which handles datetime formatting and pagination internally.
+        Falls back to REST for service principal auth.
     #>
     param(
         [string]$Token,
@@ -290,11 +383,27 @@ function Get-ActivityEvents {
         [string]$ActivityFilter = "ViewReport"
     )
 
-    $startDT = $Date.ToString("yyyy-MM-dd'T'00:00:00.000'Z'")
-    $endDT   = $Date.ToString("yyyy-MM-dd'T'23:59:59.999'Z'")
+    $startStr = $Date.ToString("yyyy-MM-ddT00:00:00.000")
+    $endStr   = $Date.ToString("yyyy-MM-ddT23:59:59.999")
 
-    $uri = "$PBI_BASE_URL/admin/activityevents?startDateTime='$startDT'&endDateTime='$endDT'&`$filter=Activity eq '$ActivityFilter'"
+    # Prefer the MicrosoftPowerBIMgmt cmdlet — it handles the API's datetime quirks internally
+    if (Get-Command Get-PowerBIActivityEvent -ErrorAction SilentlyContinue) {
+        Write-Verbose "[GET-ACTIVITYEVENTS] Using Get-PowerBIActivityEvent cmdlet for $($Date.ToString('yyyy-MM-dd'))"
+        # Note: -ActivityType is accepted but not reliably enforced by all module versions.
+        # Filter client-side after retrieval to guarantee only the requested activity type.
+        $raw = Get-PowerBIActivityEvent -StartDateTime $startStr -EndDateTime $endStr
+        # Cmdlet returns raw JSON string; convert to objects
+        $events = if ($raw -is [string] -and $raw) { $raw | ConvertFrom-Json } elseif ($raw) { $raw } else { @() }
+        return @($events | Where-Object { $_.Activity -eq $ActivityFilter })
+    }
 
+    # REST fallback for service principal auth
+    # Per Microsoft docs: single-quoted ISO 8601 with milliseconds and Z suffix
+    $startDT = "'$($startStr)Z'"
+    $endDT   = "'$($endStr)Z'"
+    $filter  = [Uri]::EscapeDataString("Activity eq '$ActivityFilter'")
+    $uri     = "$PBI_BASE_URL/admin/activityevents?startDateTime=$startDT&endDateTime=$endDT&`$filter=$filter"
+    Write-Verbose "[GET-ACTIVITYEVENTS] URI: $uri"
     return Invoke-PBIRestMethod -Uri $uri -Token $Token
 }
 
@@ -306,27 +415,44 @@ function Get-AllActivityEvents {
     #>
     param(
         [string]$Token,
-        [int]$Days = 90
+        [int]$Days = 30
     )
 
+    # Power BI audit log retention is 30 days. Requesting more than 30 days will cause
+    # BadRequest errors for dates outside the retention window.
+    if ($Days -gt 30) {
+        Write-Host "[ACTIVITY] Warning: Power BI audit log retention is 30 days. Dates beyond 30 days will be skipped." -ForegroundColor Yellow
+    }
     Write-Host "[ACTIVITY] Pulling ViewReport activity for the last $Days days..." -ForegroundColor Cyan
 
     $allEvents = @()
     $today     = (Get-Date).Date
     $startDate = $today.AddDays(-$Days)
 
+    $skippedDays = 0
+
     for ($d = $startDate; $d -lt $today; $d = $d.AddDays(1)) {
         $dayStr = $d.ToString("yyyy-MM-dd")
         Write-Host "  Fetching $dayStr ..." -NoNewline
 
-        $events = Get-ActivityEvents -Token $Token -Date $d
-        $count  = ($events | Measure-Object).Count
-
-        Write-Host " $count events" -ForegroundColor $(if ($count -gt 0) { "Green" } else { "DarkGray" })
-        $allEvents += $events
+        try {
+            $events = Get-ActivityEvents -Token $Token -Date $d
+            $count  = ($events | Measure-Object).Count
+            Write-Host " $count events" -ForegroundColor $(if ($count -gt 0) { "Green" } else { "DarkGray" })
+            $allEvents += $events
+        }
+        catch {
+            $skippedDays++
+            Write-Host " FAILED" -ForegroundColor Red
+            Write-Host "    Error: $($_.Exception.Message)" -ForegroundColor Red
+        }
 
         # Small delay to be kind to the API rate limits
         Start-Sleep -Milliseconds 200
+    }
+
+    if ($skippedDays -gt 0) {
+        Write-Host "[ACTIVITY] $skippedDays day(s) skipped (dates may exceed the tenant's activity log retention limit)." -ForegroundColor Yellow
     }
 
     Write-Host "[ACTIVITY] Total ViewReport events collected: $($allEvents.Count)" -ForegroundColor Green
@@ -387,7 +513,12 @@ Write-Host ""
 
 # Step 1: Authenticate
 try {
-    $token = Get-PBIAccessToken
+    if ($UseInteractiveAuth) {
+        $token = Get-PBIAccessTokenInteractive
+    }
+    else {
+        $token = Get-PBIAccessToken
+    }
 }
 catch {
     Write-Host "❌ Script terminated: authentication failed. Verify your credentials and try again." -ForegroundColor Red
@@ -438,7 +569,21 @@ Write-Host "✅ [EXPORT] Report inventory  -> $reportOutPath" -ForegroundColor G
 # Step 3: Pull Activity Log events (ViewReport)
 $activityEvents = Get-AllActivityEvents -Token $token -Days $ActivityDays
 
-# Step 4: Correlate activity with inventory
+# Diagnostics: verify event count and field structure before correlation
+Write-Host ""
+Write-Host "[DIAGNOSTIC] Activity events collected : $($activityEvents.Count)" -ForegroundColor Cyan
+if ($activityEvents.Count -gt 0) {
+    $sample = $activityEvents[0]
+    Write-Host "[DIAGNOSTIC] Sample event properties   : $( ($sample | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name) -join ', ' )" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Sample ReportId           : $($sample.ReportId)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Sample ArtifactId         : $($sample.ArtifactId)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Sample UserId             : $($sample.UserId)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] First inventory ReportId  : $($reportInventory[0].ReportId)" -ForegroundColor Cyan
+} else {
+    Write-Host "[DIAGNOSTIC] 0 events returned - activity API may be returning empty results or all days were skipped." -ForegroundColor Yellow
+    Write-Host "[DIAGNOSTIC] Run with -Verbose to see per-day URIs and skip reasons." -ForegroundColor Yellow
+}
+Write-Host ""
 Write-Host ""
 Write-Host "[CORRELATE] Joining activity data with report inventory..." -ForegroundColor Cyan
 
