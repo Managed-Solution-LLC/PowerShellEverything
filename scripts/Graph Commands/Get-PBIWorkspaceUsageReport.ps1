@@ -22,15 +22,30 @@
         AND the Fabric Admin Portal tenant setting 'Service principals can access read-only admin APIs' enabled.
       - Interactive user login via -UseInteractiveAuth (requires MicrosoftPowerBIMgmt module)
         Use this when the SP is still pending permission propagation or for ad-hoc runs.
+      - Service account (ROPC) via -Username / -Password and -ClientId
+        Unattended delegated-auth workaround when SP client_credentials auth is blocked at the
+        Power BI service layer. The account must have the Power BI Administrator Entra role and
+        must not be subject to MFA or device-compliance Conditional Access policies.
+        Requires 'Allow public client flows' enabled on the app registration (Entra ID >
+        App registrations > Authentication > Allow public client flows = Yes).
 
 .PARAMETER TenantId
     Azure AD / Entra ID Tenant ID.
 
 .PARAMETER ClientId
-    App Registration (Service Principal) Client ID.
+    App Registration (Service Principal) Client ID. Required for ServicePrincipal and
+    ServiceAccount parameter sets.
 
 .PARAMETER ClientSecret
     App Registration Client Secret. For production use, pull from Key Vault.
+
+.PARAMETER Username
+    UPN of the service account used for ROPC (delegated) authentication.
+    The account must have the Power BI Administrator Entra role and must not require MFA.
+    Store this value securely (environment variable, Key Vault, or automation credential).
+
+.PARAMETER Password
+    Password for the service account. Store securely — do not hardcode in scripts.
 
 .PARAMETER OutputPath
     Directory to write the output files. Defaults to the current directory.
@@ -64,15 +79,26 @@
         -UseInteractiveAuth `
         -OutputPath "C:\Reports\PBI" -OutputFormat "json" -ActivityDays 60
 
+.EXAMPLE
+    .\Get-PBIWorkspaceUsageReport.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+        -ClientId "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" `
+        -Username "svc-powerbi@yourdomain.com" `
+        -Password $env:SVC_PBI_PASSWORD `
+        -OutputPath "C:\Reports\PBI" -OutputFormat "json" -ActivityDays 29
+
 .NOTES
     Author  : Managed Solution - Will Ford
-    Version : 1.2.0
-    Date    : 2026-03-20
+    Version : 1.3.0
+    Date    : 2026-03-26
 
     Requirements:
     - PowerShell 5.1 or later
     - Service Principal with Power BI Admin API access (or -UseInteractiveAuth with admin account)
     - Write access to the OutputPath directory
+
+    Updates in v1.3.0:
+    - Added -Username / -Password (ServiceAccount) parameter set for unattended ROPC auth
+      as a workaround when SP client_credentials auth is blocked at the Power BI service layer.
 
     Updates in v1.2.0:
     - Added -UseInteractiveAuth switch for interactive login via MicrosoftPowerBIMgmt module
@@ -91,6 +117,7 @@ param(
     [string]$TenantId,
 
     [Parameter(Mandatory = $true, ParameterSetName = 'ServicePrincipal', HelpMessage = "App Registration (Service Principal) Client ID")]
+    [Parameter(Mandatory = $true, ParameterSetName = 'ServiceAccount', HelpMessage = "App Registration Client ID (must have Allow public client flows enabled)")]
     [ValidateNotNullOrEmpty()]
     [string]$ClientId,
 
@@ -100,6 +127,14 @@ param(
 
     [Parameter(Mandatory = $true, ParameterSetName = 'Interactive', HelpMessage = "Use interactive browser login instead of a service principal")]
     [switch]$UseInteractiveAuth,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'ServiceAccount', HelpMessage = "UPN of service account with Power BI Administrator role and no MFA requirement")]
+    [ValidateNotNullOrEmpty()]
+    [string]$Username,
+
+    [Parameter(Mandatory = $true, ParameterSetName = 'ServiceAccount', HelpMessage = "Service account password as SecureString. Example: ConvertTo-SecureString `$env:SVC_PBI_PASSWORD -AsPlainText -Force")]
+    [ValidateNotNull()]
+    [SecureString]$Password,
 
     [Parameter(Mandatory = $false, HelpMessage = "Directory to write output files")]
     [string]$OutputPath = ".",
@@ -255,6 +290,94 @@ function Get-PBIAccessToken {
     }
 }
 
+function Get-PBIAccessTokenROPC {
+    <#
+    .SYNOPSIS
+        Acquires a delegated bearer token via ROPC (Resource Owner Password Credentials).
+        Use when SP client_credentials auth is blocked at the Power BI service layer.
+    .NOTES
+        Requires:
+        - App registration: 'Allow public client flows' = Yes (Entra ID > App registrations >
+          Authentication > Advanced settings)
+        - Service account: Power BI Administrator Entra role, no MFA, no device-compliance CA policies
+        - Password passed as SecureString:
+          -Password (ConvertTo-SecureString $env:SVC_PBI_PASSWORD -AsPlainText -Force)
+    #>
+    Write-Host "[AUTH] Acquiring access token via ROPC (service account: $Username)..." -ForegroundColor Cyan
+
+    $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+    )
+
+    $body = @{
+        grant_type = "password"
+        client_id  = $ClientId
+        username   = $Username
+        password   = $plainPassword
+        scope      = $SCOPE
+    }
+
+    try {
+        $response = Invoke-RestMethod -Uri $AUTH_URL -Method POST -Body $body `
+            -ContentType "application/x-www-form-urlencoded" -ErrorAction Stop
+
+        if (-not $response.access_token) {
+            throw "Response missing access_token. Response: $($response | ConvertTo-Json)"
+        }
+
+        Write-Host "[AUTH] Token acquired. Expires in $($response.expires_in) seconds." -ForegroundColor Green
+        return $response.access_token
+    }
+    catch {
+        Write-Host "❌ [AUTH] ROPC token acquisition failed" -ForegroundColor Red
+        Write-Host "   HTTP Error : $($_.Exception.Message)" -ForegroundColor Yellow
+
+        # The AADSTS error code and description are in the response body, not the exception message
+        $responseBody = $_.ErrorDetails.Message
+        if ($responseBody) {
+            try {
+                $errObj = $responseBody | ConvertFrom-Json
+                Write-Host "   AADSTS Code: $($errObj.error)" -ForegroundColor Yellow
+                Write-Host "   Description: $($errObj.error_description)" -ForegroundColor Yellow
+                $errDetail = "$($errObj.error) $($errObj.error_description)"
+            }
+            catch {
+                Write-Host "   Response   : $responseBody" -ForegroundColor Yellow
+                $errDetail = $responseBody
+            }
+        }
+        else {
+            $errDetail = $_.Exception.Message
+        }
+
+        if ($errDetail -match "AADSTS50076|MFA|multi.factor") {
+            Write-Host "   Hint: The service account has MFA enabled or required by Conditional Access." -ForegroundColor Yellow
+            Write-Host "         Exclude the account from MFA policies or use -UseInteractiveAuth instead." -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS50126|invalid_grant|Invalid credentials") {
+            Write-Host "   Hint: Invalid username or password." -ForegroundColor Yellow
+            Write-Host "         Verify the account UPN and that the password is current (not expired)." -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS50053|locked") {
+            Write-Host "   Hint: The account is locked. Unlock it in Entra ID or wait for the lockout to expire." -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS70011|invalid_scope") {
+            Write-Host "   Hint: Verify the scope and that the app registration has Power BI API permissions." -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS65001|consent") {
+            Write-Host "   Hint: Admin consent has not been granted for the requested permissions." -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS90010|public.client") {
+            Write-Host "   Hint: Enable 'Allow public client flows' on the app registration:" -ForegroundColor Yellow
+            Write-Host "         Entra ID > App registrations > [App] > Authentication > Allow public client flows = Yes" -ForegroundColor Yellow
+        }
+        elseif ($errDetail -match "AADSTS50034|user.*not found|no account") {
+            Write-Host "   Hint: The username '$Username' was not found in this tenant." -ForegroundColor Yellow
+        }
+        throw
+    }
+}
+
 function Invoke-PBIRestMethod {
     <#
     .SYNOPSIS
@@ -333,13 +456,21 @@ function Invoke-PBIRestMethod {
             $allResults += $response.activityEventEntities
         }
 
-        # Advance pagination
+        # Advance pagination — priority: odata.nextLink > continuationUri > continuationToken
+        # The activity events API returns both continuationUri (complete URL) and continuationToken.
+        # continuationUri is already correctly formed; using it avoids manually reconstructing
+        # the URL from the token (which must omit the original startDateTime/$filter params).
         $currentUri = $null
-        if ($response.'odata.nextLink')  { $currentUri = $response.'odata.nextLink' }
-        if ($response.continuationUri)   { $currentUri = $response.continuationUri }
-        if ($response.continuationToken) {
-            $sep = if ($Uri -match "\?") { "&" } else { "?" }
-            $currentUri = "$Uri${sep}continuationToken=$($response.continuationToken)"
+        if ($response.'odata.nextLink') {
+            $currentUri = $response.'odata.nextLink'
+        }
+        elseif ($response.continuationUri) {
+            $currentUri = $response.continuationUri
+        }
+        elseif ($response.continuationToken) {
+            # Fallback: strip original query params — continuationToken replaces startDateTime/$filter
+            $baseUri = ($Uri -split '\?')[0]
+            $currentUri = "${baseUri}?continuationToken=$([Uri]::EscapeDataString($response.continuationToken))"
         }
 
     } while ($currentUri)
@@ -386,8 +517,8 @@ function Get-ActivityEvents {
     $startStr = $Date.ToString("yyyy-MM-ddT00:00:00.000")
     $endStr   = $Date.ToString("yyyy-MM-ddT23:59:59.999")
 
-    # Prefer the MicrosoftPowerBIMgmt cmdlet — it handles the API's datetime quirks internally
-    if (Get-Command Get-PowerBIActivityEvent -ErrorAction SilentlyContinue) {
+    # Prefer the MicrosoftPowerBIMgmt cmdlet — only when using interactive auth (requires active Login-PowerBI session)
+    if ($UseInteractiveAuth -and (Get-Command Get-PowerBIActivityEvent -ErrorAction SilentlyContinue)) {
         Write-Verbose "[GET-ACTIVITYEVENTS] Using Get-PowerBIActivityEvent cmdlet for $($Date.ToString('yyyy-MM-dd'))"
         # Note: -ActivityType is accepted but not reliably enforced by all module versions.
         # Filter client-side after retrieval to guarantee only the requested activity type.
@@ -515,6 +646,9 @@ Write-Host ""
 try {
     if ($UseInteractiveAuth) {
         $token = Get-PBIAccessTokenInteractive
+    }
+    elseif ($PSCmdlet.ParameterSetName -eq 'ServiceAccount') {
+        $token = Get-PBIAccessTokenROPC
     }
     else {
         $token = Get-PBIAccessToken
