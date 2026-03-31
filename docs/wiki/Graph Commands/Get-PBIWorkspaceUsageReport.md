@@ -4,6 +4,63 @@
 
 `Get-PBIWorkspaceUsageReport.ps1` generates a comprehensive Power BI workspace and report usage report. It inventories all reports across all workspaces (including personal workspaces), correlates them with Power BI Activity Log data for the last 30 days by default (up to 90 days for Fabric/Premium capacities), and produces a detailed usage analysis showing view counts and unique users per report. Supports both Service Principal and interactive user authentication. Outputs in CSV or JSON format.
 
+## API Reference
+
+This script communicates with three distinct API surfaces depending on the authentication mode used.
+
+### 1. Microsoft Identity Platform — Token Endpoint
+
+Used to acquire OAuth 2.0 bearer tokens for all non-interactive authentication modes.
+
+| Property | Value |
+|----------|-------|
+| **URL** | `https://login.microsoftonline.com/{TenantId}/oauth2/v2.0/token` |
+| **Method** | `POST` |
+| **Content-Type** | `application/x-www-form-urlencoded` |
+| **Scope** | `https://analysis.windows.net/powerbi/api/.default` |
+
+**Grant types used:**
+
+| Grant Type | Parameter Set | Description |
+|------------|--------------|-------------|
+| `client_credentials` | `ServicePrincipal` | App-only auth using Client ID + Client Secret |
+| `password` (ROPC) | `ServiceAccount` | Delegated auth using a service account UPN + password. Requires "Allow public client flows" enabled on the app registration. |
+
+---
+
+### 2. Power BI Admin REST API
+
+Base URL: `https://api.powerbi.com/v1.0/myorg`
+
+All endpoints used are under the `/admin/` path, which requires either the **Fabric Administrator** Entra ID role on the calling identity, or the **"Service principals can access read-only admin APIs"** tenant setting enabled in the Fabric Admin Portal.
+
+| Endpoint | Operation | Description |
+|----------|-----------|-------------|
+| `GET /admin/groups?$expand=reports,datasets&$top=5000` | Admin — GetGroupsAsAdmin | Returns all workspaces in the tenant including personal workspaces, with their reports and datasets expanded. `StorageUsedMB` is populated for Premium/Fabric capacity workspaces only. Paginated via `odata.nextLink`. |
+| `GET /admin/activityevents?startDateTime=...&endDateTime=...&$filter=Activity eq 'ViewReport'` | Admin — ActivityEvents | Returns Power BI activity log events for a single UTC day. The script loops day-by-day over the configured `ActivityDays` window. Paginated via `continuationUri` / `continuationToken`. |
+
+**Pagination:** Both endpoints are paged. The wrapper `Invoke-PBIRestMethod` follows `odata.nextLink`, `continuationUri`, and `continuationToken` automatically.
+
+**Rate limiting:** The script handles HTTP `429 Too Many Requests` with an automatic retry after the `Retry-After` interval, plus a 200 ms courtesy delay between activity log day-requests.
+
+**Retention note:** The activity log endpoint returns `400 Bad Request` for dates outside the tenant's retention window (30 days for standard tenants; up to 90 days for Fabric/Premium). Out-of-range days are skipped automatically.
+
+---
+
+### 3. MicrosoftPowerBIMgmt PowerShell Module (Interactive Auth only)
+
+Used exclusively when `-UseInteractiveAuth` is specified. These are PowerShell cmdlet wrappers over the same Power BI REST API surfaces above.
+
+| Cmdlet | Description |
+|--------|-------------|
+| `Login-PowerBI` | Opens a browser-based interactive login prompt and establishes a Power BI session. |
+| `Get-PowerBIAccessToken` | Returns the current bearer token from the active session. Used to reuse an existing session without re-prompting. |
+| `Get-PowerBIActivityEvent -StartDateTime ... -EndDateTime ...` | Wraps the activity events REST endpoint. Returns raw JSON; the script converts and filters to `ViewReport` events client-side. |
+
+**Module requirement:** `Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser`
+
+---
+
 ## Features
 
 - **Full Workspace Inventory** - Enumerates all shared and personal workspaces using Power BI Admin APIs

@@ -11,6 +11,10 @@
       3. Report views over the last 90 days
       4. # of unique report users for the last 90 days
       5. A list of users who viewed each report
+      6. Workspace-level size: StorageUsedMB (populated for Premium/Fabric; may be null
+         for shared-capacity workspaces), plus DatasetCount and ReportCount as a proxy
+      7. Device/client type breakdown — counts of views by ClientType (Web, Desktop,
+         Mobile, Embedded, Excel, etc.) per report and as a tenant-wide summary
 
     APIs Used:
       - Admin - Groups GetGroupsAsAdmin   -> workspace + report inventory
@@ -88,13 +92,19 @@
 
 .NOTES
     Author  : Managed Solution - Will Ford
-    Version : 1.3.0
-    Date    : 2026-03-26
+    Version : 1.4.0
+    Date    : 2026-03-31
 
     Requirements:
     - PowerShell 5.1 or later
     - Service Principal with Power BI Admin API access (or -UseInteractiveAuth with admin account)
     - Write access to the OutputPath directory
+
+    Updates in v1.4.0:
+    - Added workspace-level size fields: StorageUsedMB (Premium/Fabric only), DatasetCount,
+      ReportCount per workspace, exported to PBI_Workspace_Size_$timestamp file
+    - Added device/client type breakdown: per-report DeviceTypes column in usage summary
+      and a new PBI_DeviceType_Summary_$timestamp export with tenant-wide device counts
 
     Updates in v1.3.0:
     - Added -Username / -Password (ServiceAccount) parameter set for unattended ROPC auth
@@ -200,6 +210,8 @@ $ext               = $OutputFormat.ToLower()
 $reportOutPath     = Join-Path $OutputPath "PBI_Report_Inventory_$timestamp.$ext"
 $usageOutPath      = Join-Path $OutputPath "PBI_Report_Usage_$timestamp.$ext"
 $userDetailOutPath = Join-Path $OutputPath "PBI_Report_UserDetails_$timestamp.$ext"
+$wsSizeOutPath     = Join-Path $OutputPath "PBI_Workspace_Size_$timestamp.$ext"
+$deviceTypeOutPath = Join-Path $OutputPath "PBI_DeviceType_Summary_$timestamp.$ext"
 $summaryPath       = Join-Path $OutputPath "PBI_Usage_Summary_$timestamp.txt"
 
 # ------------------------------------------------------------------------------
@@ -488,9 +500,10 @@ function Get-AllWorkspacesAndReports {
 
     Write-Host "[INVENTORY] Fetching all workspaces with reports (Admin API)..." -ForegroundColor Cyan
 
-    # expand=reports includes report metadata in the workspace response
+    # expand=reports,datasets includes report metadata and dataset list per workspace.
+    # StorageUsedMB is populated for Premium/Fabric capacity workspaces.
     # top=5000 is the max page size for this endpoint
-    $uri = "$PBI_BASE_URL/admin/groups?`$expand=reports&`$top=5000"
+    $uri = "$PBI_BASE_URL/admin/groups?`$expand=reports,datasets&`$top=5000"
 
     $workspaces = Invoke-PBIRestMethod -Uri $uri -Token $Token
 
@@ -669,18 +682,25 @@ foreach ($ws in $workspaces) {
     $wsName = if ($ws.name) { $ws.name } else { "[Personal - $($ws.id)]" }
 
     if ($ws.reports) {
+        $wsDatasetCount = if ($ws.datasets) { @($ws.datasets).Count } else { 0 }
+        $wsReportCount  = @($ws.reports).Count
+        $wsStorageMB    = $ws.storageUsed   # populated for Premium/Fabric; null for shared capacity
+
         foreach ($report in $ws.reports) {
             $reportInventory += [PSCustomObject]@{
-                WorkspaceId      = $ws.id
-                WorkspaceName    = $wsName
-                WorkspaceType    = $wsType
-                WorkspaceState   = $ws.state
-                ReportId         = $report.id
-                ReportName       = $report.name
-                ReportWebUrl     = $report.webUrl
-                DatasetId        = $report.datasetId
-                CreatedDateTime  = $report.createdDateTime
-                ModifiedDateTime = $report.modifiedDateTime
+                WorkspaceId          = $ws.id
+                WorkspaceName        = $wsName
+                WorkspaceType        = $wsType
+                WorkspaceState       = $ws.state
+                WorkspaceStorageUsedMB = $wsStorageMB
+                WorkspaceDatasetCount  = $wsDatasetCount
+                WorkspaceReportCount   = $wsReportCount
+                ReportId             = $report.id
+                ReportName           = $report.name
+                ReportWebUrl         = $report.webUrl
+                DatasetId            = $report.datasetId
+                CreatedDateTime      = $report.createdDateTime
+                ModifiedDateTime     = $report.modifiedDateTime
             }
         }
     }
@@ -699,6 +719,27 @@ Write-Host ""
 
 Export-Data -Data $reportInventory -FilePath $reportOutPath -Format $OutputFormat
 Write-Host "✅ [EXPORT] Report inventory  -> $reportOutPath" -ForegroundColor Green
+
+# Build workspace-level size summary (one row per workspace that has reports)
+$workspaceSizeRows = @{}
+foreach ($row in $reportInventory) {
+    if (-not $workspaceSizeRows.ContainsKey($row.WorkspaceId)) {
+        $workspaceSizeRows[$row.WorkspaceId] = [PSCustomObject]@{
+            WorkspaceId          = $row.WorkspaceId
+            WorkspaceName        = $row.WorkspaceName
+            WorkspaceType        = $row.WorkspaceType
+            WorkspaceState       = $row.WorkspaceState
+            StorageUsedMB        = $row.WorkspaceStorageUsedMB
+            DatasetCount         = $row.WorkspaceDatasetCount
+            ReportCount          = $row.WorkspaceReportCount
+        }
+    }
+}
+$workspaceSizeSummary = $workspaceSizeRows.Values | Sort-Object WorkspaceName
+
+Export-Data -Data $workspaceSizeSummary -FilePath $wsSizeOutPath -Format $OutputFormat
+Write-Host "✅ [EXPORT] Workspace sizes   -> $wsSizeOutPath" -ForegroundColor Green
+Write-Host "   Note: StorageUsedMB is only populated for Premium/Fabric capacity workspaces." -ForegroundColor DarkGray
 
 # Step 3: Pull Activity Log events (ViewReport)
 $activityEvents = Get-AllActivityEvents -Token $token -Days $ActivityDays
@@ -730,6 +771,30 @@ foreach ($event in $activityEvents) {
     $activityByReport[$rid] += $event
 }
 
+# Build tenant-wide device/client type aggregation
+# ClientType values: Web, Desktop, Mobile, Embedded, Excel, PowerAutomate, REST, etc.
+$deviceTypeMap = @{}
+foreach ($event in $activityEvents) {
+    $ct = if ($event.ClientType) { $event.ClientType } else { "Unknown" }
+    if (-not $deviceTypeMap.ContainsKey($ct)) {
+        $deviceTypeMap[$ct] = @{ TotalViews = 0; Users = @{}; Reports = @{} }
+    }
+    $deviceTypeMap[$ct].TotalViews++
+    if ($event.UserId)   { $deviceTypeMap[$ct].Users[$event.UserId]     = 1 }
+    if ($event.ReportId) { $deviceTypeMap[$ct].Reports[$event.ReportId] = 1 }
+}
+$deviceTypeSummary = @()
+foreach ($ct in ($deviceTypeMap.Keys | Sort-Object)) {
+    $d = $deviceTypeMap[$ct]
+    $deviceTypeSummary += [PSCustomObject]@{
+        ClientType    = $ct
+        TotalViews    = $d.TotalViews
+        UniqueUsers   = $d.Users.Count
+        UniqueReports = $d.Reports.Count
+    }
+}
+$deviceTypeSummary = $deviceTypeSummary | Sort-Object TotalViews -Descending
+
 # Build the usage summary per report
 $usageSummary = @()
 $userDetails  = @()
@@ -741,17 +806,28 @@ foreach ($report in $reportInventory) {
     $users     = $events | Where-Object { $_.UserId } | Select-Object -ExpandProperty UserId -Unique
     $viewCount = ($events | Measure-Object).Count
 
+    # Device/client type breakdown for this report
+    $reportDeviceTypes = $events | Where-Object { $_.ClientType } |
+        Group-Object ClientType | Sort-Object Count -Descending |
+        ForEach-Object { "$($_.Name):$($_.Count)" }
+    $deviceTypesValue = if ($OutputFormat -eq "json") {
+        @($reportDeviceTypes)
+    } else {
+        ($reportDeviceTypes -join "; ")
+    }
+
     $usageSummary += [PSCustomObject]@{
-        ReportId        = $rid
-        ReportName      = $report.ReportName
-        WorkspaceId     = $report.WorkspaceId
-        WorkspaceName   = $report.WorkspaceName
-        WorkspaceType   = $report.WorkspaceType
-        TotalViews_90d  = $viewCount
-        UniqueUsers_90d = $users.Count
-        UserList_90d    = if ($OutputFormat -eq "json") { @($users) } else { ($users -join "; ") }
-        DatasetId       = $report.DatasetId
-        ReportWebUrl    = $report.ReportWebUrl
+        ReportId           = $rid
+        ReportName         = $report.ReportName
+        WorkspaceId        = $report.WorkspaceId
+        WorkspaceName      = $report.WorkspaceName
+        WorkspaceType      = $report.WorkspaceType
+        TotalViews_90d     = $viewCount
+        UniqueUsers_90d    = $users.Count
+        UserList_90d       = if ($OutputFormat -eq "json") { @($users) } else { ($users -join "; ") }
+        DeviceTypes_90d    = $deviceTypesValue
+        DatasetId          = $report.DatasetId
+        ReportWebUrl       = $report.ReportWebUrl
     }
 
     foreach ($user in $users) {
@@ -779,12 +855,33 @@ Write-Host "✅ [EXPORT] Usage summary     -> $usageOutPath" -ForegroundColor Gr
 Export-Data -Data $userDetails -FilePath $userDetailOutPath -Format $OutputFormat
 Write-Host "✅ [EXPORT] User details      -> $userDetailOutPath" -ForegroundColor Green
 
+Export-Data -Data $deviceTypeSummary -FilePath $deviceTypeOutPath -Format $OutputFormat
+Write-Host "✅ [EXPORT] Device type summary -> $deviceTypeOutPath" -ForegroundColor Green
+
 # Step 6: Console summary & text report
 $reportsWithUsage    = ($usageSummary | Where-Object { $_.TotalViews_90d -gt 0 }).Count
 $reportsWithoutUsage = $totalReports - $reportsWithUsage
 $totalViews          = ($usageSummary | Measure-Object -Property TotalViews_90d -Sum).Sum
 $totalUniqueUsers    = ($userDetails | Select-Object -ExpandProperty UserId -Unique).Count
 $topReports          = $usageSummary | Select-Object -First 10
+
+# Workspace size summary lines (top 10 by dataset count, show storage if available)
+$topWorkspaces = $workspaceSizeSummary | Sort-Object DatasetCount -Descending | Select-Object -First 10
+$wsSizeLines   = $topWorkspaces | ForEach-Object {
+    $storagePart = if ($null -ne $_.StorageUsedMB) { "{0,8:N1} MB" -f $_.StorageUsedMB } else { "       N/A" }
+    "  {0,-45} {1} | {2,3} datasets | {3,3} reports | [{4}]" -f `
+        $_.WorkspaceName.Substring(0, [Math]::Min($_.WorkspaceName.Length, 45)),
+        $storagePart,
+        $_.DatasetCount,
+        $_.ReportCount,
+        $_.WorkspaceType
+}
+
+# Device type summary lines
+$deviceLines = $deviceTypeSummary | ForEach-Object {
+    "  {0,-20} {1,6} views | {2,4} users | {3,4} reports" -f `
+        $_.ClientType, $_.TotalViews, $_.UniqueUsers, $_.UniqueReports
+}
 
 $summaryText = @"
 ═══════════════════════════════════════════════════════════════
@@ -806,6 +903,13 @@ USAGE (Last $ActivityDays Days)
   Total Report Views     : $totalViews
   Total Unique Users     : $totalUniqueUsers
 
+TOP 10 WORKSPACES BY DATASET COUNT
+  (StorageUsedMB is populated for Premium/Fabric capacity only)
+$( $wsSizeLines -join "`n" )
+
+DEVICE / CLIENT TYPE BREAKDOWN (Last $ActivityDays Days)
+$( if ($deviceLines) { $deviceLines -join "`n" } else { "  No activity events with ClientType data found." } )
+
 TOP 10 MOST-VIEWED REPORTS
 $( ($topReports | ForEach-Object {
     "  {0,-50} {1,6} views | {2,3} users | [{3}] {4}" -f `
@@ -817,10 +921,12 @@ $( ($topReports | ForEach-Object {
 }) -join "`n" )
 
 OUTPUT FILES
-  Report Inventory : $reportOutPath
-  Usage Summary    : $usageOutPath
-  User Details     : $userDetailOutPath
-  This Summary     : $summaryPath
+  Report Inventory   : $reportOutPath
+  Usage Summary      : $usageOutPath
+  User Details       : $userDetailOutPath
+  Workspace Sizes    : $wsSizeOutPath
+  Device Type Summary: $deviceTypeOutPath
+  This Summary       : $summaryPath
 ═══════════════════════════════════════════════════════════════
 "@
 
