@@ -9,6 +9,8 @@ PowerShell scripts for configuring and managing Windows client machines, includi
 | Script | Description |
 |--------|-------------|
 | [Set-FortinetVPNRegistry.ps1](Set-FortinetVPNRegistry.ps1) | Pre-configures FortiClient SSL VPN tunnel registry entries on a Windows client. |
+| [Set-WHBRegistry.ps1](Set-WHBRegistry.ps1) | Enables Windows Hello for Business and Biometrics registry keys. |
+| [Remove-BioDB.ps1](Remove-BioDB.ps1) | Resets the Windows Biometric Database by removing all .dat files and restarting the service. |
 
 ---
 
@@ -58,4 +60,6 @@ For Intune deployment, ensure the script is configured to run in **system contex
 ## Related Documentation
 
 - [Wiki: Set-FortinetVPNRegistry](../../docs/wiki/Client%20Computer/Set-FortinetVPNRegistry.md)
+- [Wiki: Set-WHBRegistry](../../docs/wiki/Client%20Computer/Set-WHBRegistry.md)
+- [Wiki: Remove-BioDB](../../docs/wiki/Client%20Computer/Remove-BioDB.md)
 - [FortiClient Administration Guide](https://docs.fortinet.com/document/forticlient/latest/administration-guide)
