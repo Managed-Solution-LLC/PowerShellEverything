@@ -322,9 +322,9 @@ Establish performance baselines:
 - All services running properly
 
 ## Related Scripts
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Complete environment assessment
-- [Get-LyncServiceStatus.ps1](Get-LyncServiceStatus.md) - Detailed service status
-- [Get-LyncInfrastructureReport.ps1](Get-LyncInfrastructureReport.md) - Infrastructure configuration
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Complete environment assessment
+- [Get-LyncServiceStatus.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncServiceStatus) - Detailed service status
+- [Get-LyncInfrastructureReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncInfrastructureReport) - Infrastructure configuration
 
 ## Version History
 - **v2.0** (2025-09-17): Enhanced health diagnostics

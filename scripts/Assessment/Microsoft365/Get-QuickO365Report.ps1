@@ -925,28 +925,3 @@ elseif ($zipFile -and (Test-Path $zipFile)) {
 Write-Host ""
 Write-Host "Execution time: $(((Get-Date) - $StartTime).ToString('mm\:ss'))" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Green
-Write-Host ""
-    Write-Host ""
-    Write-Host "[INFO] Collecting license information..." -ForegroundColor Cyan
-    try {
-        $msolUsers = Get-MsolUser -All -ErrorAction Stop
-        Write-Host "   Found $($msolUsers.Count) users" -ForegroundColor Yellow
-        foreach ($user in $msolUsers) {
-            $licenseNames = @()
-            foreach ($license in $user.Licenses) {
-                if ($license.AccountSkuId) {
-                    $licenseNames += $license.AccountSkuId
-                }
-            }
-            if ($licenseNames.Count -gt 0) {
-                $userLicenses[$user.UserPrincipalName] = $licenseNames -join '; '
-            } else {
-                $userLicenses[$user.UserPrincipalName] = "No License"
-            }
-        }
-        Write-Host "[OK] Collected license data for $($userLicenses.Count) users" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "[WARNING] Error collecting licenses: $($_.Exception.Message)" -ForegroundColor Yellow
-        $msolConnected = $false
-    }

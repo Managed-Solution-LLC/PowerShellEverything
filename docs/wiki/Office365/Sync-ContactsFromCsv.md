@@ -410,8 +410,8 @@ Phone number updates use minimal bandwidth; name updates require slightly more.
 
 ## Related Scripts
 
-- [[New-Office365Accounts|New-Office365Accounts.ps1]] - Create bulk user accounts (wiki page coming soon)
-- [[Set-OfficeContacts|Set-OfficeContacts.ps1]] - Manage individual contact properties (wiki page coming soon)
+- [New-Office365Accounts](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/New-Office365Accounts) - Create bulk user accounts
+- [Set-OfficeContacts](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-OfficeContacts) - Manage individual contact properties (wiki page coming soon)
 - [Get-GraphToken.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/scripts/Graph%20Commands/Get-GraphToken.ps1) - Generate Microsoft Graph authentication tokens
 
 ## Version History

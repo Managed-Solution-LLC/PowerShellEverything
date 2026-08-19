@@ -308,9 +308,9 @@ This script works seamlessly with:
 Compatible with comprehensive assessment output as long as worksheet names match.
 
 ## Related Scripts
-- [Get-QuickO365Report](Get-QuickO365Report.md) - Quick O365 tenant assessment
-- [Get-MailboxPermissionsReport](Get-MailboxPermissionsReport.md) - Mailbox delegation analysis
-- [Get-MailboxRules](Get-MailboxRules.md) - Mailbox rule auditing
+- [Get-QuickO365Report](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-QuickO365Report) - Quick O365 tenant assessment
+- [Get-MailboxPermissionsReport](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxPermissionsReport) - Mailbox delegation analysis
+- [Get-MailboxRules](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxRules) - Mailbox rule auditing
 
 ## Version History
 - **v1.2** (2025-12-23): Added Teams site filtering, SharePoint tier pricing, empty mailbox exclusion, M365 Group detection, table format output

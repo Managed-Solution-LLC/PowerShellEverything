@@ -9,7 +9,7 @@
 
 .PARAMETER ParameterName
     [folder]
-    Specifies the folder name to which files will be archived. Valid options are Billing, LA Office, NC Office.
+    Specifies the folder name to which files will be archived. Specify any destination folder name relevant to your archive structure (e.g., "Billing", "Archive").
     [tier]
     Specifies the storage tier for the blobs. Valid options are Hot, Cold, Archive.
     [blobSasToken]
@@ -18,17 +18,17 @@
     Specifies the local path to the files that need to be archived.
 
 .EXAMPLE
-    .\AzCopyCommand.ps1 -folder "Billing" -tier "cold" -blobSasToken "https://mystorageaccount.blob.core.windows.net/archiveblob?sv=2020-08-04&ss=b&srt=sco&sp=rwdlacup&se=2021-12-31T23:59:59Z&st=2021-01-01T00:00:00Z&spr=https&sig=exampleSASToken" -path "C:\FilesToArchive"
-    This example archives files from the specified path to the Billing folder in the Cold tier of Azure Blob Storage.
+    .\AzCopyCommand.ps1 -folder "Archive" -tier "cold" -blobSasToken "https://mystorageaccount.blob.core.windows.net/archiveblob?sv=2020-08-04&ss=b&srt=sco&sp=rwdlacup&se=2021-12-31T23:59:59Z&st=2021-01-01T00:00:00Z&spr=https&sig=exampleSASToken" -path "C:\FilesToArchive"
+    This example archives files from the specified path to the destination folder in the Cold tier of Azure Blob Storage.
 
     $blobToken = "https://mystorageaccount.blob.core.windows.net/archiveblob?sv=2020-08-04&ss=b&srt=sco&sp=rwdlacup&se=2021-12-31T23:59:59Z&st=2021-01-01T00:00:00Z&spr=https&sig=exampleSASToken"
     $multipath = @("C:\FilesToArchive1", "C:\FilesToArchive2")
     foreach ($item in $multipath) {
-        .\AzCopyCommand.ps1 -folder "Billing" -tier "cold" -blobSasToken $blobToken -path $item
+        .\AzCopyCommand.ps1 -folder "Archive" -tier "cold" -blobSasToken $blobToken -path $item
     }
-    This example demonstrates how to use the script in a loop to archive multiple paths to the Billing folder in the Cold tier of Azure Blob Storage.
+    This example demonstrates how to use the script in a loop to archive multiple paths to the destination folder in the Cold tier of Azure Blob Storage.
 
-    .\AzCopyCommand.ps1 "NC Office" "Archive" "https://mystorageaccount.blob.core.windows.net/archiveblob?sv=2020-08-04&ss=b&srt=sco&sp=rwdlacup&se=2021-12-31T23:59:59Z&st=2021-01-01T00:00:00Z&spr=https&sig=exampleSASToken" "C:\FilesToArchive"
+    .\AzCopyCommand.ps1 "Archive" "Archive" "https://mystorageaccount.blob.core.windows.net/archiveblob?sv=2020-08-04&ss=b&srt=sco&sp=rwdlacup&se=2021-12-31T23:59:59Z&st=2021-01-01T00:00:00Z&spr=https&sig=exampleSASToken" "C:\FilesToArchive"
 # AzCopyCommand.ps1 - A PowerShell script to archive files to Azure Blob Storage using AzCopy
 .NOTES
     Author: William Ford

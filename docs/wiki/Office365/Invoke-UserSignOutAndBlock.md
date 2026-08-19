@@ -190,5 +190,5 @@ The script will log a `Failed` status for accounts that cannot be resolved and c
 - [Microsoft Docs: Revoke Sign-In Sessions](https://learn.microsoft.com/en-us/graph/api/user-revokesigninsessions)
 - [Microsoft Docs: Update User (AccountEnabled)](https://learn.microsoft.com/en-us/graph/api/user-update)
 - [Microsoft Docs: Update Device](https://learn.microsoft.com/en-us/graph/api/device-update)
-- [[Set-EmailToSharedAccount]] — Convert offboarded mailboxes to shared and remove licenses
-- [[Set-SMTPForward]] — Configure SMTP forwarding during offboarding or migration
+- [Set-EmailToSharedAccount](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-EmailToSharedAccount) — Convert offboarded mailboxes to shared and remove licenses
+- [Set-SMTPForward](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-SMTPForward) — Configure SMTP forwarding during offboarding or migration

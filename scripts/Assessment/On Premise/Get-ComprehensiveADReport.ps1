@@ -103,7 +103,7 @@ param(
     [Parameter(Mandatory=$false, HelpMessage="Output directory for assessment reports")]
     [string]$OutputDirectory = "C:\Reports\AD_Assessment",
     
-    [Parameter(Mandatory=$false, HelpMessage="Target domain FQDN (e.g., sachicis.org)")]
+    [Parameter(Mandatory=$false, HelpMessage="Target domain FQDN (e.g., contoso.com)")]
     [string]$Domain,
     
     [Parameter(Mandatory=$false, HelpMessage="Specific domain controller to query")]

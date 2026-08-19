@@ -685,12 +685,17 @@ Install-Module ModuleName -Scope CurrentUser
 ### GitHub Wiki Link Structure
 When documenting scripts, use proper link formats that work with GitHub's wiki workflow (files in `docs/wiki/` are synced to the repo's wiki):
 
+**Wiki Base URL:** `https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/`
+
+Wiki page links use the filename (without `.md` extension) appended to the base URL.
+
 **Link Types:**
 
-1. **Wiki-to-Wiki Cross-References** (for future related script wiki pages):
+1. **Wiki Page Links** (for wiki documentation pages):
    ```markdown
-   [[New-Office365Accounts]] - Alternative format when wiki page is created
-   [[New-Office365Accounts|Display Text]] - With custom link text
+   [New-Office365Accounts](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/New-Office365Accounts)
+   [Start Here](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-Here)
+   [Get-ComprehensiveTeamsReport](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveTeamsReport)
    ```
 
 2. **Links to Repository Files** (scripts, templates, format guides):
@@ -706,13 +711,16 @@ When documenting scripts, use proper link formats that work with GitHub's wiki w
    ```
 
 **Do NOT use:**
+- ❌ `[[PageName]]` wiki-style syntax (use full URLs instead)
 - ❌ Relative paths like `../../templates/file.csv` (breaks in wiki)
 - ❌ `file://` or `vscode://` URI schemes
 - ❌ Path-only links like `../../../scripts/file.ps1` (not accessible from wiki)
+- ❌ `.md` extension in wiki URLs (GitHub wiki strips it automatically)
 
 **Best Practice:**
-- Use full GitHub URLs (`https://github.com/...`) for any files in the main repository
-- Use wiki-style links (`[[PageName]]`) only for established wiki pages within the wiki repository
+- Use `https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/PageName` for all wiki page links
+- Use `https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/...` for repository file links
+- Wiki page name = filename without `.md` extension (e.g., `Start-Here.md` → `wiki/Start-Here`)
 - Include a note like "(wiki documentation coming soon)" for related scripts without wiki pages yet
 
 ### Documentation Validation Checklist
@@ -722,7 +730,7 @@ Before considering script documentation complete:
 - [ ] All examples use generic organization names
 - [ ] Wiki documentation created in correct location (`docs/wiki/<CategoryPath>/<ScriptName>.md`)
 - [ ] **All file links use full GitHub URLs** (https://github.com/...), not relative paths
-- [ ] **Related script links use wiki syntax** `[[PageName]]` with "(coming soon)" notes if wiki page doesn't exist
+- [ ] **Wiki links use full URL format** (`https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/PageName`) without `.md` extension
 - [ ] Folder-level README.md updated or created in script's directory
 - [ ] Folder README links to wiki articles for all scripts
 - [ ] Prerequisites clearly documented with versions

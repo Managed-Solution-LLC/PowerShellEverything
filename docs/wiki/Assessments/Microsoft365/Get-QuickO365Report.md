@@ -154,9 +154,9 @@ cd "path\to\scripts"
 
 ## 📚 Additional Documentation
 
-- [Office 365 Assessment Scripts Wiki](../../docs/wiki/Office365-Assessment-Scripts.md)
-- [Code Standards](../../docs/wiki/Code-Standards.md)
-- [Contributing Guidelines](../../CONTRIBUTING.md)
+- [Office 365 Assessment Scripts Wiki](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Office365-Assessment-Scripts)
+- [Code Standards](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Code-Standards)
+- [Contributing Guidelines](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/CONTRIBUTING)
 
 ---
 
@@ -187,4 +187,4 @@ For issues, questions, or contributions:
 ---
 
 **Author:** W. Ford (Managed Solution LLC)  
-**License:** See [LICENSE](../../../../LICENSE) file
+**License:** See [LICENSE](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/docs/LICENSE.md) file

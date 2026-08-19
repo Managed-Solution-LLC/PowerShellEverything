@@ -355,9 +355,9 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 - Leverages existing Azure AD device authentication
 
 ## Related Scripts
-- [Start-ReEnrollWithPackage.ps1](../../scripts/Intune/.prep/Start-ReEnrollWithPackage.ps1) - Re-enrollment using provisioning package (customer-specific)
-- [Set-DeviceName.ps1](Set-DeviceName.md) - Intune device naming script
-- [Get-IntuneAppPolicies.ps1](../Assessment/Get-IntuneAppPolicies.md) - Intune app policy assessment
+- [Start-ReEnrollWithPackage.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/scripts/Intune/.prep/Start-ReEnrollWithPackage.ps1) - Re-enrollment using provisioning package (customer-specific)
+- [Set-DeviceName.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-DeviceName) - Intune device naming script
+- [Get-IntuneAppPolicies.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-IntuneAppPolicies) - Intune app policy assessment
 
 ## Version History
 - **v1.0** (2026-01-02): Initial release

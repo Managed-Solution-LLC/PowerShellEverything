@@ -300,9 +300,9 @@ Complete data export including:
 **Total: 9 CSV files** with complete environment snapshot.
 
 ## Related Scripts
-- [Export-ADLyncTeamsMigrationData.ps1](Export-ADLyncTeamsMigrationData.md) - AD attribute export for migration
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Detailed text report
-- [Get-LyncUserRegistrationReport.ps1](Get-LyncUserRegistrationReport.md) - User registration analysis
+- [Export-ADLyncTeamsMigrationData.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADLyncTeamsMigrationData) - AD attribute export for migration
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Detailed text report
+- [Get-LyncUserRegistrationReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncUserRegistrationReport) - User registration analysis
 
 ## Version History
 - **v2.0** (2025-09-17): Phone inventory support
@@ -319,4 +319,4 @@ Complete data export including:
 ## See Also
 - [Lync Server Management Shell](https://docs.microsoft.com/en-us/skypeforbusiness/manage/management-shell)
 - [Lync Server Cmdlet Reference](https://docs.microsoft.com/en-us/powershell/skype/)
-- [Office365 Migration Guide](../../Office365-Quick-Start.md)
+- [Office365 Migration Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Office365-Quick-Start)

@@ -1,0 +1,6 @@
+# Power BI Workspace Usage Report — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+msal>=1.28.0        # Microsoft Authentication Library — SP, ROPC, and device-code flow
+requests>=2.31.0    # HTTP client for Power BI Admin REST API calls
+boto3>=1.34.0       # AWS SDK — required only if using --s3-bucket upload (optional at runtime)

@@ -151,8 +151,8 @@ $user.serviceProvisioningErrors | ConvertTo-Json
 
 ## Related Scripts
 
-- [[Get-GraphToken]] - Token acquisition
-- [[Get-GraphHeaders]] - Authorization headers
+- [Get-GraphToken](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphToken) - Token acquisition
+- [Get-GraphHeaders](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphHeaders) - Authorization headers
 
 ## Version History
 

@@ -454,8 +454,8 @@ Write-Host "Found $($sharedMailboxes.Count) shared mailboxes with delegated acce
 
 ## 📚 Related Scripts
 
-- **[Get-QuickO365Report.ps1](Get-QuickO365Report.md)** - Complete O365 assessment including mailboxes, licenses, SharePoint
-- **[Get-ComprehensiveO365Report.ps1](.prep/Get-ComprehensiveO365Report.md)** - Extended assessment with additional features
+- **[Get-QuickO365Report.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-QuickO365Report)** - Complete O365 assessment including mailboxes, licenses, SharePoint
+- **[Get-ComprehensiveO365Report.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveO365Report)** - Extended assessment with additional features
 
 ---
 
@@ -477,7 +477,7 @@ Write-Host "Found $($sharedMailboxes.Count) shared mailboxes with delegated acce
 
 Found a bug or have a feature request? 
 - GitHub Issues: [PowerShellEveryting Issues](https://github.com/Managed-Solution-LLC/PowerShellEveryting/issues)
-- Pull Requests: Follow [Contributing Guidelines](../../../../CONTRIBUTING.md)
+- Pull Requests: Follow [Contributing Guidelines](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/docs/CONTRIBUTING)
 
 ---
 
@@ -490,5 +490,5 @@ Found a bug or have a feature request?
 ---
 
 **Author:** W. Ford (Managed Solution LLC)  
-**License:** See [LICENSE](../../../../LICENSE)  
+**License:** See [LICENSE](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/docs/LICENSE.md)  
 **Last Updated:** December 23, 2025

@@ -33,13 +33,13 @@
     Export only users that have SIP addresses (Lync/SfB enabled users)
     
 .EXAMPLE
-    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "CVESD" -ExportToCsv
+    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "Contoso" -ExportToCsv
     
 .EXAMPLE
-    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "CVESD" -SipUsersOnly -ExportToCsv
+    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "Contoso" -SipUsersOnly -ExportToCsv
     
 .EXAMPLE
-    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "CVESD" -IncludeDisabledUsers -IncludeServiceAccounts -SearchBase "OU=Users,DC=contoso,DC=com"
+    .\Export-ADLyncTeamsMigrationData.ps1 -OrganizationName "Contoso" -IncludeDisabledUsers -IncludeServiceAccounts -SearchBase "OU=Users,DC=contoso,DC=com"
     
 .NOTES
     Author: W. Ford

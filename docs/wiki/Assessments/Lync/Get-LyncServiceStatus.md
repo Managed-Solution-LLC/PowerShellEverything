@@ -341,9 +341,9 @@ if ($stoppedServices) {
 **Disabled + Stopped**: Normal - service intentionally disabled
 
 ## Related Scripts
-- [Get-LyncHealthReport.ps1](Get-LyncHealthReport.md) - Comprehensive health diagnostics
-- [Get-LyncInfrastructureReport.ps1](Get-LyncInfrastructureReport.md) - Infrastructure configuration
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Complete environment assessment
+- [Get-LyncHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncHealthReport) - Comprehensive health diagnostics
+- [Get-LyncInfrastructureReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncInfrastructureReport) - Infrastructure configuration
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Complete environment assessment
 
 ## Version History
 - **v2.0** (2025-09-17): Enhanced service monitoring

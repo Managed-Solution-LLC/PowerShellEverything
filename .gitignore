@@ -1,2 +1,16 @@
 **/.prep/**
 scripts/Azure/azcopy.exe
+
+# Vendor binaries - don't belong in source control / may carry redistribution restrictions
+*.exe
+
+# Certificates and private key material
+*.pfx
+*.cer
+*.pem
+*.key
+
+# Raw exported data / assessment output that may contain real customer data
+scripts/Entra/allMailboxes.json
+scripts/Data Processing/Windows11_Readiness_Results.csv
+*.csv.bak

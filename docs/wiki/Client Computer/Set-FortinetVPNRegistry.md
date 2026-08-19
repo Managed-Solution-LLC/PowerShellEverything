@@ -141,6 +141,6 @@ Remove-Item -Path "HKLM:\SOFTWARE\Fortinet\FortiClient\Sslvpn\Tunnels\<VPN Name>
 
 ## See Also
 
-- [Client Computer Scripts README](../../scripts/Client%20Computer/README.md)
+- [Client Computer Scripts README](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/scripts/Client%20Computer/README)
 - [FortiClient Administration Guide](https://docs.fortinet.com/document/forticlient/latest/administration-guide)
 - [Intune PowerShell Script Deployment](https://learn.microsoft.com/en-us/mem/intune/apps/intune-management-extension)

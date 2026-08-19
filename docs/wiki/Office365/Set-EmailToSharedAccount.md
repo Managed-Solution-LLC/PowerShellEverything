@@ -172,5 +172,5 @@ Run the script as a user with write access to the output path, or specify a diff
 
 - [Microsoft Docs: Set-Mailbox](https://learn.microsoft.com/powershell/module/exchange/set-mailbox)
 - [Microsoft Docs: Assign/Remove Licenses via Graph](https://learn.microsoft.com/graph/api/user-assignlicense)
-- [[Invoke-UserSignOutAndBlock]] — Block sign-in and revoke sessions for offboarded accounts
-- [[Set-SMTPForward]] — Configure SMTP forwarding to redirect mail after conversion
+- [Invoke-UserSignOutAndBlock](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Invoke-UserSignOutAndBlock) — Block sign-in and revoke sessions for offboarded accounts
+- [Set-SMTPForward](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-SMTPForward) — Configure SMTP forwarding to redirect mail after conversion

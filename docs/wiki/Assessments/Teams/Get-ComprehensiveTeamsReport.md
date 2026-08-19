@@ -387,9 +387,9 @@ Compare-Object $previousTeams $currentTeams -Property DisplayName
 ```
 
 ## Related Scripts
-- [Get-ComprehensiveLyncReport.ps1](../Lync/Get-ComprehensiveLyncReport.md) - Lync/Skype assessment for Teams migration planning
-- [Export-ADLyncTeamsMigrationData.ps1](../Lync/Export-ADLyncTeamsMigrationData.md) - AD export for Teams migration
-- [TeamsInfrastructureAssessment.psm1](TeamsInfrastructureAssessment.md) - Modular Teams assessment functions
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Lync/Skype assessment for Teams migration planning
+- [Export-ADLyncTeamsMigrationData.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADLyncTeamsMigrationData) - AD export for Teams migration
+- [TeamsInfrastructureAssessment.psm1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/TeamsInfrastructureAssessment) - Modular Teams assessment functions
 
 ## Version History
 - **v1.0** (2025-12-15): Initial release

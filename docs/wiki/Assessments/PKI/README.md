@@ -6,9 +6,9 @@ Quick start guide for PowerShell scripts that assess, monitor, and consolidate P
 
 | Script | Purpose | Best For |
 |--------|---------|----------|
-| [Get-ComprehensivePKIReport.ps1](Get-ComprehensivePKIReport.md) | Deep infrastructure assessment | Quarterly audits, migration planning, compliance |
-| [Get-PKIHealthReport.ps1](Get-PKIHealthReport.md) | Operational health monitoring | Weekly checks, troubleshooting, SLA monitoring |
-| [Merge-PKIAssessmentReports.ps1](Merge-PKIAssessmentReports.md) | Multi-CA consolidation | Executive reporting, cross-CA analysis |
+| [Get-ComprehensivePKIReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensivePKIReport) | Deep infrastructure assessment | Quarterly audits, migration planning, compliance |
+| [Get-PKIHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-PKIHealthReport) | Operational health monitoring | Weekly checks, troubleshooting, SLA monitoring |
+| [Merge-PKIAssessmentReports.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Merge-PKIAssessmentReports) | Multi-CA consolidation | Executive reporting, cross-CA analysis |
 
 ## Quick Start
 
@@ -41,7 +41,7 @@ Quick start guide for PowerShell scripts that assess, monitor, and consolidate P
 
 ## Available Scripts
 
-### [Get-ComprehensivePKIReport.ps1](Get-ComprehensivePKIReport.md)
+### [Get-ComprehensivePKIReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensivePKIReport)
 Deep PKI infrastructure assessment with certificate inventory, template analysis, and permissions export.
 
 **Key Features**:
@@ -57,7 +57,7 @@ Deep PKI infrastructure assessment with certificate inventory, template analysis
 .\Get-ComprehensivePKIReport.ps1 -DaysToExpiration 30
 ```
 
-### [Get-PKIHealthReport.ps1](Get-PKIHealthReport.md)
+### [Get-PKIHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-PKIHealthReport)
 Operational health monitoring with automated scoring (0-100) and actionable recommendations.
 
 **Key Features**:
@@ -74,7 +74,7 @@ Operational health monitoring with automated scoring (0-100) and actionable reco
 .\Get-PKIHealthReport.ps1 -DaysToExpiration 15 -EventLogHours 48
 ```
 
-### [Merge-PKIAssessmentReports.ps1](Merge-PKIAssessmentReports.md)
+### [Merge-PKIAssessmentReports.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Merge-PKIAssessmentReports)
 Consolidates PKI data from multiple CAs into single Excel workbook with 10 worksheets.
 
 **Key Features**:

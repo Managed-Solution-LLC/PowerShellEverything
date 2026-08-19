@@ -408,8 +408,8 @@ Send-MailMessage `
 
 ## Related Scripts
 
-- [Get-ComprehensivePKIReport.ps1](Get-ComprehensivePKIReport.md) - Generate assessment data
-- [Get-PKIHealthReport.ps1](Get-PKIHealthReport.md) - Generate health data
+- [Get-ComprehensivePKIReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensivePKIReport) - Generate assessment data
+- [Get-PKIHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-PKIHealthReport) - Generate health data
 
 ## Version History
 

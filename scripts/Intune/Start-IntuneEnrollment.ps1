@@ -225,30 +225,30 @@ function Get-IntuneEnrollmentStatus {
             ServiceURL = $null
             DetectionMethod = $null
         }
-        
+
         # Method 1: Check primary enrollment registry path
         Write-Verbose "Method 1: Checking HKLM:\SOFTWARE\Microsoft\Enrollments" -Verbose
         $enrollmentPath = "HKLM:\SOFTWARE\Microsoft\Enrollments"
-        
+
         if (Test-Path $enrollmentPath) {
             $enrollments = Get-ChildItem -Path $enrollmentPath -ErrorAction SilentlyContinue
             Write-Verbose "  Found $($enrollments.Count) enrollment entries" -Verbose
-            
+
             foreach ($enrollment in $enrollments) {
                 Write-Verbose "  Checking enrollment: $($enrollment.PSChildName)" -Verbose
                 $providerID = Get-ItemProperty -Path $enrollment.PSPath -Name "ProviderID" -ErrorAction SilentlyContinue
                 Write-Verbose "    ProviderID: $($providerID.ProviderID)" -Verbose
-                
+
                 # Check for various Intune provider identifiers
                 if ($providerID.ProviderID -in @("MS DM Server", "Intune", "Microsoft Intune")) {
                     $upn = Get-ItemProperty -Path $enrollment.PSPath -Name "UPN" -ErrorAction SilentlyContinue
                     $discoveryServiceFullURL = Get-ItemProperty -Path $enrollment.PSPath -Name "DiscoveryServiceFullURL" -ErrorAction SilentlyContinue
                     $enrollmentState = Get-ItemProperty -Path $enrollment.PSPath -Name "EnrollmentState" -ErrorAction SilentlyContinue
-                    
+
                     Write-Verbose "    UPN: $($upn.UPN)" -Verbose
                     Write-Verbose "    Service URL: $($discoveryServiceFullURL.DiscoveryServiceFullURL)" -Verbose
                     Write-Verbose "    Enrollment State: $($enrollmentState.EnrollmentState)" -Verbose
-                    
+
                     # Check if enrollment is active (state 1 = enrolled)
                     if ($null -eq $enrollmentState -or $enrollmentState.EnrollmentState -eq 1) {
                         $enrollmentFound = $true
@@ -259,7 +259,15 @@ function Get-IntuneEnrollmentStatus {
                             ServiceURL = $discoveryServiceFullURL.DiscoveryServiceFullURL
                             DetectionMethod = "Registry-Enrollments"
                         }
-                        Write-Verbose "  ✓ Active Intune enrollment found via Registry" -Verbose
+                        Write-Verbose "  Active Intune enrollment found via Registry" -Verbose
+                        break
+                    }
+                }
+            }
+        }
+
+        # Method 2: Check OMADM Accounts path (only if not already found)
+        if (-not $enrollmentFound) {
             Write-Verbose "Method 2: Checking HKLM:\SOFTWARE\Microsoft\Provisioning\OMADM\Accounts" -Verbose
             $mdmPath = "HKLM:\SOFTWARE\Microsoft\Provisioning\OMADM\Accounts"
             if (Test-Path $mdmPath) {
@@ -278,25 +286,22 @@ function Get-IntuneEnrollmentStatus {
                             ServiceURL = $serverUrl.ServerUrl
                             DetectionMethod = "Registry-OMADM"
                         }
-                        Write-Verbose "  ✓ Active Intune enrollment found via OMADM" -Verbose
+                        Write-Verbose "  Active Intune enrollment found via OMADM" -Verbose
                         break
                     }
                 }
             }
             else {
-                Write-Verbose "  OMADM path does not exist" -Verbose   if ($serverUrl.ServerUrl -like "*manage.microsoft.com*" -or $serverUrl.ServerUrl -like "*intune*") {
-                        $enrollmentFound = $true
-                        $enrollmentInfo = @{
-                            IsEnrolled = $true
-                            EnrollmentGUID = $account.PSChildName
-                            UPN = $null
-                            ServiceURL = $serverUrl.ServerUrl
-                            DetectionMethod = "Registry-OMADM"
-                        }
+                Write-Verbose "  OMADM path does not exist" -Verbose
+            }
+        }
+
+        # Method 3: Check dsregcmd /status output (only if not already found)
+        if (-not $enrollmentFound) {
             Write-Verbose "Method 3: Checking dsregcmd /status output" -Verbose
             $dsregStatus = & dsregcmd /status
             Write-Verbose "  Parsing dsregcmd output..." -Verbose
-            
+
             # Try to extract MDM enrollment GUID from dsregcmd
             $mdmEnrollmentGUID = $null
             foreach ($line in $dsregStatus) {
@@ -314,8 +319,8 @@ function Get-IntuneEnrollmentStatus {
                     Write-Verbose "  EnterpriseId (potential GUID): $mdmEnrollmentGUID" -Verbose
                 }
             }
-            
-            if ($dsregStatus -match "MdmUrl\s*:\s*https://.*manage.*microsoft\.com" -or 
+
+            if ($dsregStatus -match "MdmUrl\s*:\s*https://.*manage.*microsoft\.com" -or
                 $dsregStatus -match "MDMEnrolled\s*:\s*YES") {
                 $enrollmentFound = $true
                 $mdmUrl = ($dsregStatus | Select-String "MdmUrl\s*:\s*(.+)").Matches.Groups[1].Value.Trim()
@@ -326,23 +331,15 @@ function Get-IntuneEnrollmentStatus {
                     ServiceURL = $mdmUrl
                     DetectionMethod = "dsregcmd"
                 }
-                Write-Verbose "  ✓ Active Intune enrollment found via dsregcmd" -Verbose
+                Write-Verbose "  Active Intune enrollment found via dsregcmd" -Verbose
             }
             else {
                 Write-Verbose "  No MDM enrollment found in dsregcmd output" -Verbose
             }
         }
-        
-        Write-Verbose "=== Enrollment Detection Complete ===" -Verbose       $enrollmentInfo = @{
-                    IsEnrolled = $true
-                    EnrollmentGUID = "Unknown"
-                    UPN = $null
-                    ServiceURL = $mdmUrl
-                    DetectionMethod = "dsregcmd"
-                }
-            }
-        }
-        
+
+        Write-Verbose "=== Enrollment Detection Complete ===" -Verbose
+
         # Report findings
         if ($enrollmentInfo.IsEnrolled) {
             Write-Log "Device is enrolled in Intune" -Level Success
@@ -356,7 +353,7 @@ function Get-IntuneEnrollmentStatus {
         else {
             Write-Log "Device is NOT enrolled in Intune" -Level Warning
         }
-        
+
         return $enrollmentInfo
     }
     catch {

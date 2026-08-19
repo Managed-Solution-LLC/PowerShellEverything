@@ -128,8 +128,8 @@ Install-Module MSAL.PS -Scope CurrentUser -Force
 
 ## Related Scripts
 
-- [[Get-GraphHeaders]] - Build authorization headers using this token
-- [[Get-AzureResourcePaging]] - Use with headers for paginated API calls
+- [Get-GraphHeaders](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphHeaders) - Build authorization headers using this token
+- [Get-AzureResourcePaging](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-AzureResourcePaging) - Use with headers for paginated API calls
 
 ## Version History
 

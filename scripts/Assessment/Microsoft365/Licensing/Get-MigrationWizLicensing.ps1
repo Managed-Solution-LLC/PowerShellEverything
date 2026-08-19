@@ -157,11 +157,11 @@ $PRICE_PSP_BUNDLE = 20.00
 #endregion
 
 #region Prerequisites
-Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║                                                                ║" -ForegroundColor Cyan
-Write-Host "║       MigrationWiz License Calculator                          ║" -ForegroundColor Cyan
-Write-Host "║                                                                ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "`n+================================================================+" -ForegroundColor Cyan
+Write-Host "|                                                                |" -ForegroundColor Cyan
+Write-Host "|       MigrationWiz License Calculator                          |" -ForegroundColor Cyan
+Write-Host "|                                                                |" -ForegroundColor Cyan
+Write-Host "+================================================================+" -ForegroundColor Cyan
 Write-Host ""
 
 # Check ImportExcel module
@@ -284,16 +284,16 @@ if ($mailboxSheet) {
         $userCount = $userMailboxes.Count
         $sharedMailboxCount = $sharedMailboxes.Count
         
-        Write-Host "   ✅ Found $userCount user mailboxes" -ForegroundColor Green
+        Write-Host "   [OK] Found $userCount user mailboxes" -ForegroundColor Green
         if ($sharedMailboxCount -gt 0) {
-            Write-Host "   ✅ Found $sharedMailboxCount shared mailboxes (licensed separately)" -ForegroundColor Green
+            Write-Host "   [OK] Found $sharedMailboxCount shared mailboxes - licensed separately" -ForegroundColor Green
         }
         if ($emptyMailboxCount -gt 0) {
-            Write-Host "   ℹ️  Excluded $emptyMailboxCount mailboxes with 0 GB data" -ForegroundColor Cyan
+            Write-Host "   [INFO] Excluded $emptyMailboxCount mailboxes with 0 GB data" -ForegroundColor Cyan
         }
     }
     catch {
-        Write-Host "   ⚠️  Could not read mailbox data: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   [WARN] Could not read mailbox data: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
@@ -305,10 +305,10 @@ if ($IncludeArchives) {
         try {
             $archiveData = Import-Excel -Path $InputExcelFile -WorksheetName $archiveSheet
             $archiveCount = $archiveData.Count
-            Write-Host "   ✅ Found $archiveCount archives" -ForegroundColor Green
+            Write-Host "   [OK] Found $archiveCount archives" -ForegroundColor Green
         }
         catch {
-            Write-Host "   ⚠️  Could not read archive data: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   [WARN] Could not read archive data: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 }
@@ -320,10 +320,10 @@ if ($oneDriveSheet) {
     try {
         $oneDriveData = Import-Excel -Path $InputExcelFile -WorksheetName $oneDriveSheet
         $oneDriveCount = $oneDriveData.Count
-        Write-Host "   ✅ Found $oneDriveCount OneDrive sites" -ForegroundColor Green
+        Write-Host "   [OK] Found $oneDriveCount OneDrive sites" -ForegroundColor Green
     }
     catch {
-        Write-Host "   ⚠️  Could not read OneDrive data: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "   [WARN] Could not read OneDrive data: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
@@ -369,13 +369,13 @@ if ($IncludeTeams) {
             $teamsCount = $teamsData.Count
             $teamsWithDataCount = $teamsWithData.Count
             
-            Write-Host "   ✅ Found $teamsCount Teams Sites ($teamsWithDataCount with data & Teams integration)" -ForegroundColor Green
+            Write-Host "   [OK] Found $teamsCount Teams Sites - $teamsWithDataCount with data and Teams integration" -ForegroundColor Green
             if ($teamsWithDataCount -lt $teamsCount) {
-                Write-Host "   ℹ️  Only Teams sites with data and Teams integration will be licensed" -ForegroundColor Cyan
+                Write-Host "   [INFO] Only Teams sites with data and Teams integration will be licensed" -ForegroundColor Cyan
             }
         }
         catch {
-            Write-Host "   ⚠️  Could not read Teams data: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   [WARN] Could not read Teams data: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 }
@@ -452,13 +452,13 @@ if ($IncludeSharePoint) {
             
             $sharePointLibrariesWithData = $librariesWithData.Count
             
-            Write-Host "   ✅ Found $sharePointLibraries SharePoint libraries ($sharePointLibrariesWithData with data)" -ForegroundColor Green
+            Write-Host "   [OK] Found $sharePointLibraries SharePoint libraries - $sharePointLibrariesWithData with data" -ForegroundColor Green
             if ($sharePointLibrariesWithData -lt $sharePointLibraries) {
-                Write-Host "   ℹ️  Only libraries with data will be licensed" -ForegroundColor Cyan
+                Write-Host "   [INFO] Only libraries with data will be licensed" -ForegroundColor Cyan
             }
         }
         catch {
-            Write-Host "   ⚠️  Could not read SharePoint data: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   [WARN] Could not read SharePoint data: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 }
@@ -478,10 +478,10 @@ if ($IncludePublicFolders) {
                 # Estimate from item size if available
                 $publicFolderSizeGB = 10 # Default estimate
             }
-            Write-Host "   ✅ Found public folders (~$publicFolderSizeGB GB)" -ForegroundColor Green
+            Write-Host "   [OK] Found public folders (approx. $publicFolderSizeGB GB)" -ForegroundColor Green
         }
         catch {
-            Write-Host "   ⚠️  Could not read Public Folder data: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "   [WARN] Could not read Public Folder data: $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
 }
@@ -523,7 +523,7 @@ if ($userCount -gt 0) {
         TotalCost = $userLicenseCost
         Notes = $bundleFeatures
     }
-    Write-Host "   ✅ $userCount x $bundleType @ `$$pricePerUser = `$$userLicenseCost" -ForegroundColor Green
+    Write-Host "   [OK] $userCount x $bundleType at $pricePerUser each = $userLicenseCost total" -ForegroundColor Green
 }
 
 # Teams Licenses (if not included in Tenant Bundle)
@@ -539,7 +539,7 @@ if ($IncludeTeams -and $teamsWithDataCount -gt 0 -and -not $UseTenantMigrationBu
         TotalCost = $teamsLicenseCost
         Notes = "Up to 100GB per team (Teams sites with data only)"
     }
-    Write-Host "   ✅ $teamsWithDataCount x Teams Collaboration @ `$$PRICE_TEAMS = `$$teamsLicenseCost" -ForegroundColor Green
+    Write-Host "   [OK] $teamsWithDataCount x Teams Collaboration at $PRICE_TEAMS each = $teamsLicenseCost total" -ForegroundColor Green
 }
 
 # SharePoint Licenses (if not included in Tenant Bundle) - only libraries with data
@@ -561,7 +561,7 @@ if ($IncludeSharePoint -and $sharePointLibrariesWithData -gt 0 -and -not $UseTen
             TotalCost = $sp50Cost
             Notes = "Up to 50GB per library"
         }
-        Write-Host "   ✅ $($libraries50GB.Count) x Shared Documents (50GB) @ `$$PRICE_SHARED_DOC_50GB = `$$sp50Cost" -ForegroundColor Green
+        Write-Host "   [OK] $($libraries50GB.Count) x Shared Documents 50GB at $PRICE_SHARED_DOC_50GB each = $sp50Cost total" -ForegroundColor Green
     }
     
     # License libraries over 50GB at $48
@@ -577,7 +577,7 @@ if ($IncludeSharePoint -and $sharePointLibrariesWithData -gt 0 -and -not $UseTen
             TotalCost = $sp100Cost
             Notes = "Up to 100GB per library"
         }
-        Write-Host "   ✅ $($libraries100GB.Count) x Shared Documents (100GB) @ `$$PRICE_SHARED_DOC_100GB = `$$sp100Cost" -ForegroundColor Green
+        Write-Host "   [OK] $($libraries100GB.Count) x Shared Documents 100GB at $PRICE_SHARED_DOC_100GB each = $sp100Cost total" -ForegroundColor Green
     }
 }
 
@@ -595,7 +595,7 @@ if ($sharedMailboxCount -gt 0) {
         TotalCost = $sharedMBCost
         Notes = "Shared mailboxes (up to 50GB each)"
     }
-    Write-Host "   ✅ $sharedMailboxCount x Shared Mailbox @ `$$PRICE_MAILBOX = `$$sharedMBCost" -ForegroundColor Green
+    Write-Host "   [OK] $sharedMailboxCount x Shared Mailbox at $PRICE_MAILBOX each = $sharedMBCost total" -ForegroundColor Green
 }
 
 # Public Folder Licenses
@@ -612,7 +612,7 @@ if ($IncludePublicFolders -and $publicFolderSizeGB -gt 0) {
         TotalCost = $pfLicenseCost
         Notes = "~$publicFolderSizeGB GB total size"
     }
-    Write-Host "   ✅ $pf10GBBlocks x Public Folders (10GB) @ `$$PRICE_PUBLIC_FOLDER_10GB = `$$pfLicenseCost" -ForegroundColor Green
+    Write-Host "   [OK] $pf10GBBlocks x Public Folders 10GB at $PRICE_PUBLIC_FOLDER_10GB each = $pfLicenseCost total" -ForegroundColor Green
 }
 #endregion
 
@@ -621,19 +621,19 @@ $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $reportFile = Join-Path $OutputDirectory "MigrationWiz_Licensing_$($OrganizationName -replace '[^a-zA-Z0-9]','_')_$timestamp.txt"
 
 $report = @()
-$report += "╔════════════════════════════════════════════════════════════════╗"
-$report += "║                                                                ║"
-$report += "║       BitTitan MigrationWiz License Calculation                ║"
-$report += "║                                                                ║"
-$report += "╚════════════════════════════════════════════════════════════════╝"
+$report += "+================================================================+"
+$report += "|                                                                |"
+$report += "|       BitTitan MigrationWiz License Calculation                |"
+$report += "|                                                                |"
+$report += "+================================================================+"
 $report += ""
 $report += "Organization:     $OrganizationName"
 $report += "Generated:        $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 $report += "Assessment File:  $(Split-Path $InputExcelFile -Leaf)"
 $report += ""
-$report += "═══════════════════════════════════════════════════════════════"
+$report += "==============================================================="
 $report += "MIGRATION SCOPE"
-$report += "═══════════════════════════════════════════════════════════════"
+$report += "==============================================================="
 $report += "User Mailboxes:      $userCount"
 if ($sharedMailboxCount -gt 0) { $report += "Shared Mailboxes:    $sharedMailboxCount" }
 if ($archiveCount -gt 0) { $report += "Archives:            $archiveCount" }
@@ -641,7 +641,7 @@ if ($oneDriveCount -gt 0) { $report += "OneDrive Sites:      $oneDriveCount" }
 if ($teamsCount -gt 0) { 
     $report += "Teams Sites:         $teamsCount total"
     if ($teamsWithDataCount -lt $teamsCount) {
-        $report += "  (Licensed):        $teamsWithDataCount with data & Teams integration"
+        $report += "  (Licensed):        $teamsWithDataCount with data and Teams integration"
     }
 }
 if ($sharePointLibraries -gt 0) { 
@@ -655,31 +655,31 @@ if ($sharePointLibraries -gt 0) {
 }
 if ($publicFolderSizeGB -gt 0) { $report += "Public Folders:      ~$publicFolderSizeGB GB" }
 $report += ""
-$report += "═══════════════════════════════════════════════════════════════"
+$report += "==============================================================="
 $report += "LICENSE REQUIREMENTS"
-$report += "═══════════════════════════════════════════════════════════════"
+$report += "==============================================================="
 $report += ""
 
 # Create table header
-$report += "┌────────────────────────────────┬──────────┬─────────────┬──────────────┬──────────────┐"
-$report += "│ License Type                   │ Quantity │ Unit        │ Price/Unit   │ Subtotal     │"
-$report += "├────────────────────────────────┼──────────┼─────────────┼──────────────┼──────────────┤"
+$report += "+--------------------------------+----------+-------------+--------------+--------------+"
+$report += "| License Type                   | Quantity | Unit        | Price/Unit   | Subtotal     |"
+$report += "+--------------------------------+----------+-------------+--------------+--------------+"
 
 # Add table rows
 foreach ($license in $licenses) {
     $licenseType = $license.LicenseType.PadRight(30).Substring(0, 30)
     $quantity = $license.Quantity.ToString().PadLeft(8)
     $unit = $license.Unit.PadRight(11).Substring(0, 11)
-    $pricePerUnit = ("`$" + $license.PricePerUnit.ToString()).PadLeft(12)
-    $subtotal = ("`$" + $license.TotalCost.ToString()).PadLeft(12)
+    $pricePerUnit = ('$' + $license.PricePerUnit.ToString()).PadLeft(12)
+    $subtotal = ('$' + $license.TotalCost.ToString()).PadLeft(12)
     
-    $report += "│ $licenseType │ $quantity │ $unit │ $pricePerUnit │ $subtotal │"
+    $report += "| $licenseType | $quantity | $unit | $pricePerUnit | $subtotal |"
 }
 
 # Add table footer with total
-$report += "├────────────────────────────────┴──────────┴─────────────┴──────────────┼──────────────┤"
-$report += "│ TOTAL ESTIMATED COST                                                   │ `$$($totalCost.ToString('N2').PadLeft(12)) │"
-$report += "└────────────────────────────────────────────────────────────────────────┴──────────────┘"
+$report += "+--------------------------------+----------+-------------+--------------+--------------+"
+$report += "| TOTAL ESTIMATED COST                                                   | " + "$" + "$($totalCost.ToString('N2').PadLeft(12)) |"
+$report += "+------------------------------------------------------------------------+--------------+"
 $report += ""
 
 # Add notes section after table
@@ -688,7 +688,7 @@ foreach ($license in $licenses) {
     $report += "  • $($license.LicenseType): $($license.Notes)"
 }
 $report += ""
-$report += "═══════════════════════════════════════════════════════════════"
+$report += "==============================================================="
 $report += ""
 $report += "NOTES:"
 $report += "------"
@@ -743,5 +743,5 @@ foreach ($line in $report) {
     }
 }
 
-Write-Host "`n✅ Report saved to: $reportFile" -ForegroundColor Green
+Write-Host "`n[OK] Report saved to: $reportFile" -ForegroundColor Green
 #endregion

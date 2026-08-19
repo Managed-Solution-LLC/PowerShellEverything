@@ -258,8 +258,8 @@ Use this script as part of your ADMT migration preparation:
 4. ✅ Document migration procedures
 
 ## Related Scripts
-- [Get-ComprehensiveADReport](Get-ComprehensiveADReport.md) - Assess source and target AD environments before migration
-- [Start-FileShareAssessment](Start-FileShareAssessment.md) - Assess file shares that may need permission updates post-migration
+- [Get-ComprehensiveADReport](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveADReport) - Assess source and target AD environments before migration
+- [Start-FileShareAssessment](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-FileShareAssessment) - Assess file shares that may need permission updates post-migration
 
 ## Best Practices
 

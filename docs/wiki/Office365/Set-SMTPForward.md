@@ -209,5 +209,5 @@ You may need to confirm the exact target address with the destination tenant bef
 
 - [Microsoft Docs: Set-Mailbox](https://learn.microsoft.com/powershell/module/exchange/set-mailbox)
 - [Microsoft Docs: Set-HostedOutboundSpamFilterPolicy](https://learn.microsoft.com/powershell/module/exchange/set-hostedoutboundspamfilterpolicy)
-- [[Set-EmailToSharedAccount]] — Convert mailboxes to Shared and remove licenses
-- [[Invoke-UserSignOutAndBlock]] — Block sign-in and revoke sessions
+- [Set-EmailToSharedAccount](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Set-EmailToSharedAccount) — Convert mailboxes to Shared and remove licenses
+- [Invoke-UserSignOutAndBlock](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Invoke-UserSignOutAndBlock) — Block sign-in and revoke sessions

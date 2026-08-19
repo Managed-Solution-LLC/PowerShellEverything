@@ -161,9 +161,9 @@ Full data including App ID, App AppID, Owner details, and usage counts:
 
 ## Related Scripts
 
-- [[Get-GraphToken]] - Token acquisition
-- [[Get-GraphHeaders]] - Authorization headers
-- [[Get-AzureResourcePaging]] - Used internally for app paging
+- [Get-GraphToken](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphToken) - Token acquisition
+- [Get-GraphHeaders](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphHeaders) - Authorization headers
+- [Get-AzureResourcePaging](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-AzureResourcePaging) - Used internally for app paging
 
 ## Version History
 

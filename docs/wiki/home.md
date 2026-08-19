@@ -221,7 +221,7 @@ Complete Active Directory assessment for AD to AD migration planning. Exports al
 .\Get-ComprehensiveADReport.ps1 -OrganizationName "Contoso"
 
 # Query different domain
-.\Get-ComprehensiveADReport.ps1 -Domain "sachicis.org" -OrganizationName "SACHICIS"
+.\Get-ComprehensiveADReport.ps1 -Domain "contoso.com" -OrganizationName "Contoso"
 
 # Cross-forest with credentials
 .\Get-ComprehensiveADReport.ps1 -Domain "partner.com" -Credential (Get-Credential)

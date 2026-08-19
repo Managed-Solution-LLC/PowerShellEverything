@@ -16,7 +16,7 @@
 - PowerShell 5.1 or later
 
 ### Dependencies
-- An access token from [[Get-GraphToken]] or any other OAuth2 token source
+- An access token from [Get-GraphToken](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphToken) or any other OAuth2 token source
 
 ## Parameters
 
@@ -95,8 +95,8 @@ $headers = Get-GraphHeaders -accessToken $token
 
 ## Related Scripts
 
-- [[Get-GraphToken]] - Acquire the access token passed to this function
-- [[Get-AzureResourcePaging]] - Uses these headers for paginated Graph calls
+- [Get-GraphToken](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphToken) - Acquire the access token passed to this function
+- [Get-AzureResourcePaging](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-AzureResourcePaging) - Uses these headers for paginated Graph calls
 
 ## Version History
 

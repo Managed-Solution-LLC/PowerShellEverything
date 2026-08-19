@@ -1,0 +1,96 @@
+name: Power BI Usage Report
+
+on:
+  schedule:
+    # Runs daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      activity_days:
+        description: 'Number of days of activity history (max 30)'
+        required: false
+        default: '1'
+        type: string
+      output_format:
+        description: 'Output format'
+        required: false
+        default: 'csv'
+        type: choice
+        options:
+          - csv
+          - json
+      include_refresh_history:
+        description: 'Include dataset refresh history (slower)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  generate-report:
+    runs-on: windows-latest
+    name: Generate PBI Usage Report
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install AWS.Tools.S3 module
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name AWS.Tools.Common -Force -Scope CurrentUser
+          Install-Module -Name AWS.Tools.S3 -Force -Scope CurrentUser
+          Write-Host "✅ AWS.Tools.S3 installed" -ForegroundColor Green
+
+      - name: Run PBI Usage Report
+        shell: pwsh
+        env:
+          PBI_TENANT_ID: ${{ secrets.PBI_TENANT_ID }}
+          PBI_CLIENT_ID: ${{ secrets.PBI_CLIENT_ID }}
+          PBI_SVC_USERNAME: ${{ secrets.PBI_SVC_USERNAME }}
+          PBI_SVC_PASSWORD: ${{ secrets.PBI_SVC_PASSWORD }}
+          S3_BUCKET_NAME: ${{ vars.S3_BUCKET_NAME }}
+          S3_KEY_PREFIX: ${{ vars.S3_KEY_PREFIX }}
+          S3_REGION: ${{ vars.S3_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          $activityDays = if ('${{ github.event.inputs.activity_days }}') { [int]'${{ github.event.inputs.activity_days }}' } else { 1 }
+          $outputFormat = if ('${{ github.event.inputs.output_format }}') { '${{ github.event.inputs.output_format }}' } else { 'csv' }
+          $includeRefresh = if ('${{ github.event.inputs.include_refresh_history }}' -eq 'true') { $true } else { $false }
+
+          $securePassword = ConvertTo-SecureString $env:PBI_SVC_PASSWORD -AsPlainText -Force
+
+          $params = @{
+              TenantId              = $env:PBI_TENANT_ID
+              ClientId              = $env:PBI_CLIENT_ID
+              Username              = $env:PBI_SVC_USERNAME
+              Password              = $securePassword
+              OutputPath            = "${{ github.workspace }}\reports"
+              OutputFormat          = $outputFormat
+              ActivityDays          = $activityDays
+              PublishToS3           = $true
+              S3BucketName          = $env:S3_BUCKET_NAME
+              S3KeyPrefix           = $env:S3_KEY_PREFIX
+              S3Region              = $env:S3_REGION
+          }
+
+          if ($includeRefresh) {
+              $params['IncludeRefreshHistory'] = $true
+          }
+
+          # Set AWS credentials for the session
+          $env:AWS_DEFAULT_REGION = $env:S3_REGION
+
+          & "${{ github.workspace }}\scripts\Graph Commands\Get-PBIWorkspaceUsageReport.ps1" @params
+
+      - name: Upload report artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pbi-usage-reports
+          path: ${{ github.workspace }}/reports/
+          retention-days: 30

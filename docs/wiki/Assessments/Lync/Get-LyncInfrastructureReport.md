@@ -386,10 +386,10 @@ $pools -like "*lync*"
 - ❌ Topology inconsistencies
 
 ## Related Scripts
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Complete environment assessment
-- [Get-LyncHealthReport.ps1](Get-LyncHealthReport.md) - Health monitoring and diagnostics
-- [Get-LyncServiceStatus.ps1](Get-LyncServiceStatus.md) - Service status details
-- [Start-LyncCsvExporter.ps1](Start-LyncCsvExporter.md) - CSV exports for data analysis
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Complete environment assessment
+- [Get-LyncHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncHealthReport) - Health monitoring and diagnostics
+- [Get-LyncServiceStatus.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncServiceStatus) - Service status details
+- [Start-LyncCsvExporter.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-LyncCsvExporter) - CSV exports for data analysis
 
 ## Version History
 - **v2.0** (2025-09-17): Enhanced infrastructure reporting

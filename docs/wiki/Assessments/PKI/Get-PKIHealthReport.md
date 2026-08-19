@@ -379,8 +379,8 @@ Register-ScheduledTask -TaskName "PKI Health Check" `
 
 ## Related Scripts
 
-- [Get-ComprehensivePKIReport.ps1](Get-ComprehensivePKIReport.md) - Deep PKI infrastructure assessment
-- [Merge-PKIAssessmentReports.ps1](Merge-PKIAssessmentReports.md) - Multi-CA consolidation
+- [Get-ComprehensivePKIReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensivePKIReport) - Deep PKI infrastructure assessment
+- [Merge-PKIAssessmentReports.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Merge-PKIAssessmentReports) - Multi-CA consolidation
 
 ## Version History
 

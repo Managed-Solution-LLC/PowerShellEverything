@@ -329,10 +329,10 @@ After major changes:
 4. **Low**: Optimization opportunities
 
 ## Related Scripts
-- [Start-LyncCsvExporter.ps1](Start-LyncCsvExporter.md) - CSV exports for data analysis
-- [Get-LyncHealthReport.ps1](Get-LyncHealthReport.md) - Focused health diagnostics
-- [Get-LyncInfrastructureReport.ps1](Get-LyncInfrastructureReport.md) - Infrastructure deep dive
-- [Get-LyncUserRegistrationReport.ps1](Get-LyncUserRegistrationReport.md) - User registration details
+- [Start-LyncCsvExporter.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-LyncCsvExporter) - CSV exports for data analysis
+- [Get-LyncHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncHealthReport) - Focused health diagnostics
+- [Get-LyncInfrastructureReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncInfrastructureReport) - Infrastructure deep dive
+- [Get-LyncUserRegistrationReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncUserRegistrationReport) - User registration details
 
 ## Version History
 - **v2.0** (2025-09-17): Enhanced comprehensive reporting

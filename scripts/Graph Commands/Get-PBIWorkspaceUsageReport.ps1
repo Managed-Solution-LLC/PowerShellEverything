@@ -90,15 +90,41 @@
         -Password $env:SVC_PBI_PASSWORD `
         -OutputPath "C:\Reports\PBI" -OutputFormat "json" -ActivityDays 29
 
+.EXAMPLE
+    .\Get-PBIWorkspaceUsageReport.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+        -ClientId "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" `
+        -ClientSecret "your-secret-here" `
+        -PublishToS3 -S3BucketName "my-reports-bucket" `
+        -S3KeyPrefix "pbi-reports/monthly" -S3Region "us-west-2"
+    Generates reports locally and uploads all output files to the specified S3 bucket.
+
+.EXAMPLE
+    .\Get-PBIWorkspaceUsageReport.ps1 -TenantId "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" `
+        -UseInteractiveAuth `
+        -PublishToS3 -S3BucketName "my-reports-bucket" -S3ProfileName "prod-profile"
+    Uses interactive auth and uploads to S3 using a named AWS CLI profile.
+
 .NOTES
     Author  : Managed Solution - Will Ford
-    Version : 1.4.0
-    Date    : 2026-03-31
+    Version : 1.6.0
+    Date    : 2026-05-07
 
     Requirements:
     - PowerShell 5.1 or later
     - Service Principal with Power BI Admin API access (or -UseInteractiveAuth with admin account)
     - Write access to the OutputPath directory
+    - AWS.Tools.S3 module (only when -PublishToS3 is used)
+
+    Updates in v1.6.0:
+    - Added -PublishToS3, -S3BucketName, -S3KeyPrefix, -S3Region, -S3ProfileName parameters
+      to upload all generated report files to an Amazon S3 bucket after local export
+
+    Updates in v1.5.0:
+    - Added PBI_Dataset_Health_$timestamp export: TargetStorageMode (Import/DirectQuery/Composite),
+      StorageCategory (human-readable memory proxy), IsRefreshable, gateway requirements,
+      and ConfiguredBy per dataset — built from the already-fetched workspace expand (no extra calls)
+    - Added -IncludeRefreshHistory switch: fetches last refresh StartTime, EndTime, duration (minutes),
+      and Status per refreshable dataset via GET /admin/datasets/{id}/refreshes (one call per dataset)
 
     Updates in v1.4.0:
     - Added workspace-level size fields: StorageUsedMB (Premium/Fabric only), DatasetCount,
@@ -155,7 +181,25 @@ param(
 
     [Parameter(Mandatory = $false, HelpMessage = "Number of days of activity history to pull. Standard Power BI audit log retains 30 days; Fabric/Premium may retain up to 90.")]
     [ValidateRange(1, 90)]
-    [int]$ActivityDays = 30
+    [int]$ActivityDays = 30,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Fetch the last refresh timestamp, duration, and status per refreshable dataset (one extra admin API call per dataset — can be slow on large tenants).")]
+    [switch]$IncludeRefreshHistory,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Upload all generated report files to an Amazon S3 bucket after local export.")]
+    [switch]$PublishToS3,
+
+    [Parameter(Mandatory = $false, HelpMessage = "S3 bucket name to upload reports to. Required when -PublishToS3 is set.")]
+    [string]$S3BucketName,
+
+    [Parameter(Mandatory = $false, HelpMessage = "S3 key prefix (folder path) for uploaded files. Example: 'pbi-reports/monthly'")]
+    [string]$S3KeyPrefix = "",
+
+    [Parameter(Mandatory = $false, HelpMessage = "AWS region for the S3 bucket. Example: 'us-east-1'. If omitted, uses the default region from AWS config.")]
+    [string]$S3Region,
+
+    [Parameter(Mandatory = $false, HelpMessage = "AWS CLI named profile to use for S3 authentication. If omitted, uses the default credential chain.")]
+    [string]$S3ProfileName
 )
 
 # ------------------------------------------------------------------------------
@@ -165,18 +209,26 @@ param(
 # Require PowerShell 5.1+
 if ($PSVersionTable.PSVersion.Major -lt 5 -or
     ($PSVersionTable.PSVersion.Major -eq 5 -and $PSVersionTable.PSVersion.Minor -lt 1)) {
-    Write-Host "❌ PowerShell 5.1 or later is required. Current: $($PSVersionTable.PSVersion)" -ForegroundColor Red
+    Write-Host "   PowerShell 5.1 or later is required. Current: $($PSVersionTable.PSVersion)" -ForegroundColor Red
     exit 1
+}
+
+# Validate S3 parameters when -PublishToS3 is set
+if ($PublishToS3) {
+    if (-not $S3BucketName) {
+        Write-Host "   -S3BucketName is required when -PublishToS3 is set." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Create output directory if missing
 if (-not (Test-Path -Path $OutputPath -PathType Container)) {
     try {
         New-Item -ItemType Directory -Path $OutputPath -Force -ErrorAction Stop | Out-Null
-        Write-Host "✅ Created output directory: $OutputPath" -ForegroundColor Green
+        Write-Host "   Created output directory: $OutputPath" -ForegroundColor Green
     }
     catch {
-        Write-Host "❌ Failed to create output directory: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "   Failed to create output directory: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 }
@@ -186,10 +238,10 @@ $_pbiTestFile = Join-Path $OutputPath ".pbi_write_test_$([guid]::NewGuid().ToStr
 try {
     "test" | Out-File -FilePath $_pbiTestFile -ErrorAction Stop -Encoding UTF8
     Remove-Item -Path $_pbiTestFile -Force -ErrorAction SilentlyContinue
-    Write-Host "✅ Output directory write permissions verified." -ForegroundColor Green
+    Write-Host "   Output directory write permissions verified." -ForegroundColor Green
 }
 catch {
-    Write-Host "❌ Cannot write to '$OutputPath': $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "   Cannot write to '$OutputPath': $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "   Verify you have write permissions to this location." -ForegroundColor Yellow
     exit 1
 }
@@ -210,9 +262,35 @@ $ext               = $OutputFormat.ToLower()
 $reportOutPath     = Join-Path $OutputPath "PBI_Report_Inventory_$timestamp.$ext"
 $usageOutPath      = Join-Path $OutputPath "PBI_Report_Usage_$timestamp.$ext"
 $userDetailOutPath = Join-Path $OutputPath "PBI_Report_UserDetails_$timestamp.$ext"
-$wsSizeOutPath     = Join-Path $OutputPath "PBI_Workspace_Size_$timestamp.$ext"
-$deviceTypeOutPath = Join-Path $OutputPath "PBI_DeviceType_Summary_$timestamp.$ext"
-$summaryPath       = Join-Path $OutputPath "PBI_Usage_Summary_$timestamp.txt"
+$wsSizeOutPath      = Join-Path $OutputPath "PBI_Workspace_Size_$timestamp.$ext"
+$deviceTypeOutPath  = Join-Path $OutputPath "PBI_DeviceType_Summary_$timestamp.$ext"
+$datasetHealthOutPath = Join-Path $OutputPath "PBI_Dataset_Health_$timestamp.$ext"
+$summaryPath        = Join-Path $OutputPath "PBI_Usage_Summary_$timestamp.txt"
+
+# ------------------------------------------------------------------------------
+# S3 MODULE CHECK
+# ------------------------------------------------------------------------------
+
+if ($PublishToS3) {
+    $s3Module = Get-Module -Name AWS.Tools.S3 -ListAvailable
+    if (-not $s3Module) {
+        # Fall back to the monolithic AWSPowerShell module
+        $s3Module = Get-Module -Name AWSPowerShell -ListAvailable
+    }
+    if (-not $s3Module) {
+        Write-Host "   AWS.Tools.S3 (or AWSPowerShell) module is required for -PublishToS3." -ForegroundColor Red
+        Write-Host "   Install with: Install-Module AWS.Tools.S3 -Scope CurrentUser" -ForegroundColor Yellow
+        exit 1
+    }
+    try {
+        Import-Module $s3Module[0].Name -ErrorAction Stop
+        Write-Host "   AWS module loaded: $($s3Module[0].Name) v$($s3Module[0].Version)" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "   Failed to import AWS module: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+}
 
 # ------------------------------------------------------------------------------
 # INTERACTIVE AUTH MODULE CHECK
@@ -220,7 +298,7 @@ $summaryPath       = Join-Path $OutputPath "PBI_Usage_Summary_$timestamp.txt"
 
 if ($UseInteractiveAuth) {
     if (-not (Get-Module -Name MicrosoftPowerBIMgmt -ListAvailable)) {
-        Write-Host "❌ MicrosoftPowerBIMgmt module is required for -UseInteractiveAuth." -ForegroundColor Red
+        Write-Host "   MicrosoftPowerBIMgmt module is required for -UseInteractiveAuth." -ForegroundColor Red
         Write-Host "   Install with: Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser" -ForegroundColor Yellow
         exit 1
     }
@@ -256,7 +334,7 @@ function Get-PBIAccessTokenInteractive {
         return $token -replace '^Bearer ', ''
     }
     catch {
-        Write-Host "❌ [AUTH] Interactive login failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "   [AUTH] Interactive login failed: $($_.Exception.Message)" -ForegroundColor Red
         throw
     }
 }
@@ -290,7 +368,7 @@ function Get-PBIAccessToken {
         return $response.access_token
     }
     catch {
-        Write-Host "❌ [AUTH] Failed to acquire token" -ForegroundColor Red
+        Write-Host "   [AUTH] Failed to acquire token" -ForegroundColor Red
         Write-Host "   Error: $($_.Exception.Message)" -ForegroundColor Yellow
         if ($_.Exception.Message -match "400|invalid") {
             Write-Host "   Hint: Verify that ClientId, ClientSecret, and TenantId are correct." -ForegroundColor Yellow
@@ -341,7 +419,7 @@ function Get-PBIAccessTokenROPC {
         return $response.access_token
     }
     catch {
-        Write-Host "❌ [AUTH] ROPC token acquisition failed" -ForegroundColor Red
+        Write-Host "   [AUTH] ROPC token acquisition failed" -ForegroundColor Red
         Write-Host "   HTTP Error : $($_.Exception.Message)" -ForegroundColor Yellow
 
         # The AADSTS error code and description are in the response body, not the exception message
@@ -432,7 +510,7 @@ function Invoke-PBIRestMethod {
             }
 
             if ($statusCode -eq 401) {
-                Write-Host "❌ [API] 401 Unauthorized calling: $currentUri" -ForegroundColor Red
+                Write-Host "   [API] 401 Unauthorized calling: $currentUri" -ForegroundColor Red
                 Write-Host ""
                 Write-Host "   Token was acquired successfully, but the Power BI Admin API (/admin/ endpoints) rejected the request." -ForegroundColor Yellow
                 Write-Host ""
@@ -638,9 +716,73 @@ function Export-Data {
         Write-Verbose "Exported $($Data.Count) records to: $FilePath"
     }
     catch {
-        Write-Host "❌ Failed to export data to '$FilePath': $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "   Failed to export data to '$FilePath': $($_.Exception.Message)" -ForegroundColor Red
         throw
     }
+}
+
+function Publish-FileToS3 {
+    <#
+    .SYNOPSIS
+        Uploads a local file to the specified S3 bucket with optional key prefix.
+    #>
+    param(
+        [string]$FilePath,
+        [string]$BucketName,
+        [string]$KeyPrefix,
+        [string]$Region,
+        [string]$ProfileName
+    )
+
+    $fileName = Split-Path -Leaf $FilePath
+    $s3Key = if ($KeyPrefix) {
+        $KeyPrefix.TrimEnd('/') + '/' + $fileName
+    } else {
+        $fileName
+    }
+
+    $writeParams = @{
+        BucketName = $BucketName
+        Key        = $s3Key
+        File       = $FilePath
+        ErrorAction = 'Stop'
+    }
+    if ($Region)      { $writeParams['Region']      = $Region }
+    if ($ProfileName) { $writeParams['ProfileName']  = $ProfileName }
+
+    try {
+        Write-S3Object @writeParams | Out-Null
+        Write-Host "   [S3] Uploaded -> s3://$BucketName/$s3Key" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "   [S3] Failed to upload '$fileName': $($_.Exception.Message)" -ForegroundColor Red
+        throw
+    }
+}
+
+function Resolve-DeviceType {
+    <#
+    .SYNOPSIS
+        Determines the client/device type from a Power BI activity event.
+        The /admin/activityevents API does not return a 'ClientType' field;
+        device type must be inferred from ConsumptionMethod (newer tenants)
+        or parsed from the UserAgent string.
+    #>
+    param($Event)
+
+    # ConsumptionMethod is present on newer tenants and gives the clearest signal
+    if ($Event.ConsumptionMethod) { return $Event.ConsumptionMethod }
+
+    $ua = $Event.UserAgent
+    if (-not $ua) { return "Unknown" }
+
+    if ($ua -match "Power\s*BI\s*Desktop|PowerBIDesktop")  { return "Desktop"       }
+    if ($ua -match "PowerBIMobile|okhttp|CFNetwork")        { return "Mobile"        }
+    if ($ua -match "\bExcel\b")                             { return "Excel"         }
+    if ($ua -match "PowerAutomate|MicrosoftFlow")           { return "PowerAutomate" }
+    if ($ua -match "Mozilla|Chrome|Safari|Edge|Firefox|MSIE|Trident") { return "Web" }
+    if ($ua -match "python|requests|curl|RestSharp|Postman") { return "REST/API"    }
+    return "Other"
 }
 
 # ------------------------------------------------------------------------------
@@ -668,7 +810,7 @@ try {
     }
 }
 catch {
-    Write-Host "❌ Script terminated: authentication failed. Verify your credentials and try again." -ForegroundColor Red
+    Write-Host "   Script terminated: authentication failed. Verify your credentials and try again." -ForegroundColor Red
     exit 1
 }
 
@@ -718,7 +860,7 @@ Write-Host "  Personal Workspace  : $personalReports"
 Write-Host ""
 
 Export-Data -Data $reportInventory -FilePath $reportOutPath -Format $OutputFormat
-Write-Host "✅ [EXPORT] Report inventory  -> $reportOutPath" -ForegroundColor Green
+Write-Host "   [EXPORT] Report inventory  -> $reportOutPath" -ForegroundColor Green
 
 # Build workspace-level size summary (one row per workspace that has reports)
 $workspaceSizeRows = @{}
@@ -738,8 +880,92 @@ foreach ($row in $reportInventory) {
 $workspaceSizeSummary = $workspaceSizeRows.Values | Sort-Object WorkspaceName
 
 Export-Data -Data $workspaceSizeSummary -FilePath $wsSizeOutPath -Format $OutputFormat
-Write-Host "✅ [EXPORT] Workspace sizes   -> $wsSizeOutPath" -ForegroundColor Green
+Write-Host "   [EXPORT] Workspace sizes   -> $wsSizeOutPath" -ForegroundColor Green
 Write-Host "   Note: StorageUsedMB is only populated for Premium/Fabric capacity workspaces." -ForegroundColor DarkGray
+
+# Build dataset health table (Option 1 — targetStorageMode + proxy fields, no extra API calls)
+Write-Host ""
+Write-Host "[DATASET] Building dataset health table..." -ForegroundColor Cyan
+$datasetHealth = @()
+foreach ($ws in $workspaces) {
+    if (-not $ws.datasets) { continue }
+    $wsType = if ($ws.type -eq "PersonalGroup") { "Personal" } else { "Shared" }
+    $wsName = if ($ws.name) { $ws.name } else { "[Personal - $($ws.id)]" }
+
+    foreach ($ds in $ws.datasets) {
+        # Map targetStorageMode to a human-readable memory category
+        $storageCategory = switch ($ds.targetStorageMode) {
+            "Abf"            { "Import (In-Memory)"      }
+            "PremiumFiles"   { "Import (Large Format)"   }
+            "Pbix"           { "Import (In-Memory)"      }
+            "DirectQuery"    { "DirectQuery (No Memory)" }
+            "Streaming"      { "Streaming"               }
+            "CompositeModel" { "Composite"               }
+            default          { if ($ds.targetStorageMode) { $ds.targetStorageMode } else { "Unknown" } }
+        }
+
+        $datasetHealth += [PSCustomObject]@{
+            WorkspaceId             = $ws.id
+            WorkspaceName           = $wsName
+            WorkspaceType           = $wsType
+            DatasetId               = $ds.id
+            DatasetName             = $ds.name
+            TargetStorageMode       = $ds.targetStorageMode
+            StorageCategory         = $storageCategory
+            IsRefreshable           = $ds.isRefreshable
+            IsOnPremGatewayRequired = $ds.isOnPremGatewayRequired
+            ConfiguredBy            = $ds.configuredBy
+            LastRefreshStart        = $null
+            LastRefreshEnd          = $null
+            LastRefreshDurationMin  = $null
+            LastRefreshStatus       = $null
+        }
+    }
+}
+Write-Host "[DATASET] $($datasetHealth.Count) datasets catalogued." -ForegroundColor Green
+
+# Option 2 — enrich with refresh history (one admin API call per refreshable dataset, opt-in)
+if ($IncludeRefreshHistory) {
+    $refreshable  = @($datasetHealth | Where-Object { $_.IsRefreshable -eq $true })
+    $refreshTotal = $refreshable.Count
+    Write-Host "[DATASET] Fetching refresh history for $refreshTotal refreshable dataset(s)..." -ForegroundColor Cyan
+    $refreshIdx = 0
+
+    foreach ($dsRow in $refreshable) {
+        $refreshIdx++
+        Write-Host "  [$refreshIdx/$refreshTotal] $($dsRow.DatasetName)..." -NoNewline
+
+        try {
+            $rUri  = "$PBI_BASE_URL/admin/datasets/$($dsRow.DatasetId)/refreshes?`$top=1"
+            $rResp = Invoke-RestMethod -Uri $rUri `
+                         -Headers @{ Authorization = "Bearer $token"; "Content-Type" = "application/json" } `
+                         -ErrorAction Stop
+            $latest = $rResp.value | Select-Object -First 1
+
+            if ($latest) {
+                $rStart    = [datetime]$latest.startTime
+                $rEnd      = if ($latest.endTime) { [datetime]$latest.endTime } else { $null }
+                $rDuration = if ($rEnd) { [Math]::Round(($rEnd - $rStart).TotalMinutes, 2) } else { $null }
+
+                $dsRow.LastRefreshStart       = $latest.startTime
+                $dsRow.LastRefreshEnd         = $latest.endTime
+                $dsRow.LastRefreshDurationMin = $rDuration
+                $dsRow.LastRefreshStatus      = $latest.status
+
+                $color = if ($latest.status -eq 'Completed') { 'Green' } else { 'Yellow' }
+                Write-Host " $($latest.status) ($rDuration min)" -ForegroundColor $color
+            }
+            else {
+                Write-Host " No history" -ForegroundColor DarkGray
+            }
+        }
+        catch {
+            Write-Host " ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        }
+
+        Start-Sleep -Milliseconds 200
+    }
+}
 
 # Step 3: Pull Activity Log events (ViewReport)
 $activityEvents = Get-AllActivityEvents -Token $token -Days $ActivityDays
@@ -753,6 +979,9 @@ if ($activityEvents.Count -gt 0) {
     Write-Host "[DIAGNOSTIC] Sample ReportId           : $($sample.ReportId)" -ForegroundColor Cyan
     Write-Host "[DIAGNOSTIC] Sample ArtifactId         : $($sample.ArtifactId)" -ForegroundColor Cyan
     Write-Host "[DIAGNOSTIC] Sample UserId             : $($sample.UserId)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Sample ConsumptionMethod  : $($sample.ConsumptionMethod)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Sample UserAgent          : $($sample.UserAgent)" -ForegroundColor Cyan
+    Write-Host "[DIAGNOSTIC] Resolved DeviceType       : $(Resolve-DeviceType -Event $sample)" -ForegroundColor Cyan
     Write-Host "[DIAGNOSTIC] First inventory ReportId  : $($reportInventory[0].ReportId)" -ForegroundColor Cyan
 } else {
     Write-Host "[DIAGNOSTIC] 0 events returned - activity API may be returning empty results or all days were skipped." -ForegroundColor Yellow
@@ -772,10 +1001,11 @@ foreach ($event in $activityEvents) {
 }
 
 # Build tenant-wide device/client type aggregation
-# ClientType values: Web, Desktop, Mobile, Embedded, Excel, PowerAutomate, REST, etc.
+# Uses ConsumptionMethod if present, then parses UserAgent (ClientType is a UAL field,
+# not present in the Power BI /admin/activityevents API response).
 $deviceTypeMap = @{}
 foreach ($event in $activityEvents) {
-    $ct = if ($event.ClientType) { $event.ClientType } else { "Unknown" }
+    $ct = Resolve-DeviceType -Event $event
     if (-not $deviceTypeMap.ContainsKey($ct)) {
         $deviceTypeMap[$ct] = @{ TotalViews = 0; Users = @{}; Reports = @{} }
     }
@@ -806,9 +1036,11 @@ foreach ($report in $reportInventory) {
     $users     = $events | Where-Object { $_.UserId } | Select-Object -ExpandProperty UserId -Unique
     $viewCount = ($events | Measure-Object).Count
 
-    # Device/client type breakdown for this report
-    $reportDeviceTypes = $events | Where-Object { $_.ClientType } |
-        Group-Object ClientType | Sort-Object Count -Descending |
+    # Device/client type breakdown for this report (resolved from ConsumptionMethod / UserAgent)
+    $reportDeviceTypes = $events |
+        ForEach-Object { Resolve-DeviceType -Event $_ } |
+        Where-Object { $_ -ne "Unknown" } |
+        Group-Object | Sort-Object Count -Descending |
         ForEach-Object { "$($_.Name):$($_.Count)" }
     $deviceTypesValue = if ($OutputFormat -eq "json") {
         @($reportDeviceTypes)
@@ -850,13 +1082,49 @@ $userDetails  = $userDetails  | Sort-Object ReportName, ViewCount_90d -Descendin
 
 # Step 5: Export results
 Export-Data -Data $usageSummary -FilePath $usageOutPath -Format $OutputFormat
-Write-Host "✅ [EXPORT] Usage summary     -> $usageOutPath" -ForegroundColor Green
+Write-Host "   [EXPORT] Usage summary     -> $usageOutPath" -ForegroundColor Green
 
 Export-Data -Data $userDetails -FilePath $userDetailOutPath -Format $OutputFormat
-Write-Host "✅ [EXPORT] User details      -> $userDetailOutPath" -ForegroundColor Green
+Write-Host "   [EXPORT] User details      -> $userDetailOutPath" -ForegroundColor Green
 
 Export-Data -Data $deviceTypeSummary -FilePath $deviceTypeOutPath -Format $OutputFormat
-Write-Host "✅ [EXPORT] Device type summary -> $deviceTypeOutPath" -ForegroundColor Green
+Write-Host "   [EXPORT] Device type summary -> $deviceTypeOutPath" -ForegroundColor Green
+
+Export-Data -Data $datasetHealth -FilePath $datasetHealthOutPath -Format $OutputFormat
+Write-Host "   [EXPORT] Dataset health     -> $datasetHealthOutPath" -ForegroundColor Green
+
+# Step 5b: Publish to S3 (if requested)
+if ($PublishToS3) {
+    Write-Host ""
+    Write-Host "[S3] Publishing reports to s3://$S3BucketName/$(if($S3KeyPrefix){$S3KeyPrefix + '/'}else{''})..." -ForegroundColor Cyan
+
+    $s3UploadFiles = @(
+        $reportOutPath,
+        $usageOutPath,
+        $userDetailOutPath,
+        $wsSizeOutPath,
+        $deviceTypeOutPath,
+        $datasetHealthOutPath
+    )
+
+    $s3Uploaded = 0
+    $s3Failed   = 0
+
+    foreach ($filePath in $s3UploadFiles) {
+        if (Test-Path $filePath) {
+            try {
+                Publish-FileToS3 -FilePath $filePath -BucketName $S3BucketName `
+                    -KeyPrefix $S3KeyPrefix -Region $S3Region -ProfileName $S3ProfileName
+                $s3Uploaded++
+            }
+            catch {
+                $s3Failed++
+            }
+        }
+    }
+
+    Write-Host "[S3] Upload complete: $s3Uploaded succeeded, $s3Failed failed." -ForegroundColor $(if($s3Failed -gt 0){'Yellow'}else{'Green'})
+}
 
 # Step 6: Console summary & text report
 $reportsWithUsage    = ($usageSummary | Where-Object { $_.TotalViews_90d -gt 0 }).Count
@@ -876,6 +1144,11 @@ $wsSizeLines   = $topWorkspaces | ForEach-Object {
         $_.ReportCount,
         $_.WorkspaceType
 }
+
+# Dataset storage mode breakdown (Import = in-memory; DirectQuery = no memory)
+$storageModeLines = $datasetHealth |
+    Group-Object StorageCategory | Sort-Object Count -Descending |
+    ForEach-Object { "  {0,-30} {1,5} dataset(s)" -f $_.Name, $_.Count }
 
 # Device type summary lines
 $deviceLines = $deviceTypeSummary | ForEach-Object {
@@ -908,7 +1181,12 @@ TOP 10 WORKSPACES BY DATASET COUNT
 $( $wsSizeLines -join "`n" )
 
 DEVICE / CLIENT TYPE BREAKDOWN (Last $ActivityDays Days)
-$( if ($deviceLines) { $deviceLines -join "`n" } else { "  No activity events with ClientType data found." } )
+$( if ($deviceLines) { $deviceLines -join "`n" } else { "  No activity events found (or UserAgent/ConsumptionMethod not populated)." } )
+
+DATASET STORAGE MODE BREAKDOWN
+  (Import = held in Analysis Services memory; DirectQuery = no memory footprint)
+  Note: true byte-level memory requires XMLA DMV queries on Premium/Fabric.
+$( if ($storageModeLines) { $storageModeLines -join "`n" } else { "  No dataset data found." } )
 
 TOP 10 MOST-VIEWED REPORTS
 $( ($topReports | ForEach-Object {
@@ -926,7 +1204,17 @@ OUTPUT FILES
   User Details       : $userDetailOutPath
   Workspace Sizes    : $wsSizeOutPath
   Device Type Summary: $deviceTypeOutPath
+  Dataset Health     : $datasetHealthOutPath
   This Summary       : $summaryPath
+$(if ($PublishToS3) {
+"
+  S3 PUBLISH
+  Bucket             : $S3BucketName
+  Key Prefix         : $(if ($S3KeyPrefix) { $S3KeyPrefix } else { '(root)' })
+  Region             : $(if ($S3Region) { $S3Region } else { '(default)' })
+  Uploaded           : $s3Uploaded file(s)
+  Failed             : $s3Failed file(s)"
+})
 ═══════════════════════════════════════════════════════════════
 "@
 
@@ -934,4 +1222,16 @@ $summaryText | Out-File -FilePath $summaryPath -Encoding UTF8
 Write-Host ""
 Write-Host $summaryText
 Write-Host ""
-Write-Host "✅ [DONE] All reports generated successfully." -ForegroundColor Green
+
+# Upload the summary file to S3 as well (generated after the main batch)
+if ($PublishToS3) {
+    try {
+        Publish-FileToS3 -FilePath $summaryPath -BucketName $S3BucketName `
+            -KeyPrefix $S3KeyPrefix -Region $S3Region -ProfileName $S3ProfileName
+    }
+    catch {
+        Write-Host "   [S3] Summary file upload failed (non-fatal)." -ForegroundColor Yellow
+    }
+}
+
+Write-Host "   [DONE] All reports generated successfully." -ForegroundColor Green

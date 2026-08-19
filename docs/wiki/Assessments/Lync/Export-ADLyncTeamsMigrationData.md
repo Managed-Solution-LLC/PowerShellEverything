@@ -222,8 +222,8 @@ For hybrid deployments:
 - Validate federation settings
 
 ## Related Scripts
-- [Start-LyncCsvExporter.ps1](Start-LyncCsvExporter.md) - Interactive Lync data export tool
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Complete environment assessment
+- [Start-LyncCsvExporter.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-LyncCsvExporter) - Interactive Lync data export tool
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Complete environment assessment
 - Get-TeamsUserInventory.ps1 - Post-migration Teams user analysis
 
 ## Version History
@@ -236,4 +236,4 @@ For hybrid deployments:
 ## See Also
 - [Plan for Skype for Business to Teams Upgrade](https://docs.microsoft.com/en-us/microsoftteams/upgrade-start-here)
 - [Active Directory Schema for Lync Server](https://docs.microsoft.com/en-us/skypeforbusiness/schema-reference/active-directory-schema-extensions-classes-and-attributes)
-- [Teams Migration Guide](../../Office365-Quick-Start.md)
+- [Teams Migration Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Office365-Quick-Start)

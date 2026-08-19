@@ -324,9 +324,9 @@ Send test email to verify mailbox is functioning correctly.
 - Keep backup files in secure location
 
 ## Related Scripts
-- [Get-ComprehensiveADReport.ps1](../../On%20Premise/Get-ComprehensiveADReport.md) - Assess AD environment before migration
-- [Get-MailboxPermissionsReport.ps1](../../Assessments/Microsoft365/Get-MailboxPermissionsReport.md) - Document mailbox permissions
-- [New-Office365Accounts.ps1](../../Office365/New-Office365Accounts.md) - Create Exchange Online mailboxes
+- [Get-ComprehensiveADReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveADReport) - Assess AD environment before migration
+- [Get-MailboxPermissionsReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxPermissionsReport) - Document mailbox permissions
+- [New-Office365Accounts.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/New-Office365Accounts) - Create Exchange Online mailboxes
 
 ## Version History
 - **v1.0** (2026-02-02): Initial release

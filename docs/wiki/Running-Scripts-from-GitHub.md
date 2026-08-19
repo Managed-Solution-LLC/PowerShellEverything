@@ -475,7 +475,7 @@ Receive-Job $job
 
 ## Related Documentation
 
-- [Start-IntuneEnrollment.ps1](Start-IntuneEnrollment.md) - Examples of GitHub execution with parameters
+- [Start-IntuneEnrollment.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-IntuneEnrollment) - Examples of GitHub execution with parameters
 - [PowerShell Execution Policies](https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies)
 - [Invoke-Expression Documentation](https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-expression)
 - [Invoke-RestMethod Documentation](https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-restmethod)

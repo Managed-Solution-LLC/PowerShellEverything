@@ -341,8 +341,8 @@ Import-Module ActiveDirectory
 4. Ensure adequate disk space for output files (estimate 1 KB per certificate)
 
 ## Related Scripts
-- [Export-ADLyncTeamsMigrationData.ps1](../../Lync/Export-ADLyncTeamsMigrationData.md) - Uses certificate data for Teams migration
-- [Get-ServerCertificate.ps1](../../../Security/Get-ServerCertificate.md) - Individual server certificate inspection
+- [Export-ADLyncTeamsMigrationData.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADLyncTeamsMigrationData) - Uses certificate data for Teams migration
+- [Get-ServerCertificate.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/Security/Get-ServerCertificate) - Individual server certificate inspection
 
 ## Version History
 - **v1.0** (2025-12-24): Initial release

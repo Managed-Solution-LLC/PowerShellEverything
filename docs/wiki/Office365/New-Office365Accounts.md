@@ -550,10 +550,10 @@ When running scripts from the internet:
 5. **Use raw.githubusercontent.com** - For direct script downloads
 
 ## Related Scripts
-- [New-AccountCreationTemplate.ps1](../../scripts/Assessment/Microsoft365/New-AccountCreationTemplate.md) - Generate CSV template
-- [Get-QuickO365Report.ps1](Assessments/Microsoft365/Get-QuickO365Report.md) - Tenant assessment
-- [Get-MailboxPermissionsReport.ps1](Assessments/Microsoft365/Get-MailboxPermissionsReport.md) - Audit permissions
-- [Running Scripts from GitHub Guide](../Running-Scripts-from-GitHub.md) - General guide for all scripts
+- [New-AccountCreationTemplate.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/docs/scripts/Assessment/Microsoft365/New-AccountCreationTemplate) - Generate CSV template
+- [Get-QuickO365Report.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-QuickO365Report) - Tenant assessment
+- [Get-MailboxPermissionsReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxPermissionsReport) - Audit permissions
+- [Running Scripts from GitHub Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Running-Scripts-from-GitHub) - General guide for all scripts
 
 ## Workflow Integration
 

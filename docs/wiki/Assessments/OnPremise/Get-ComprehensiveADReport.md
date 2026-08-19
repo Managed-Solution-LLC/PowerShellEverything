@@ -42,7 +42,7 @@ None - script uses sensible defaults and can run without parameters.
 - **Domain**: Target domain FQDN to query
   - Overrides default domain context
   - Essential for querying different domains or forests
-  - Example: `-Domain "sachicis.org"`
+  - Example: `-Domain "contoso.com"`
   - **Note**: All AD queries will target this domain explicitly
 
 - **DomainController**: Specific domain controller to query
@@ -116,7 +116,7 @@ Target AD assessment to compare with source data for migration validation.
 
 ### Example 7: Query Different Domain
 ```powershell
-.\Get-ComprehensiveADReport.ps1 -Domain "sachicis.org" -OrganizationName "SACHICIS"
+.\Get-ComprehensiveADReport.ps1 -Domain "contoso.com" -OrganizationName "Contoso"
 ```
 Query a specific domain by FQDN, useful when assessing multiple domains from single workstation.
 

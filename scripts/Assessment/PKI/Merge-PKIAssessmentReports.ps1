@@ -187,7 +187,7 @@ Write-Host "✅ Found $($assessmentFolders.Count) assessment folder(s)" -Foregro
 # Group by CA server name (extract from folder name)
 $caAssessments = @{}
 foreach ($folder in $assessmentFolders) {
-    # Extract CA name from folder name (e.g., "LAX11CA01_PKI_Assessment_20251224_154224")
+    # Extract CA name from folder name (e.g., "SERVERNAME_PKI_Assessment_20251224_154224")
     if ($folder.Name -match '^(.+?)_PKI_Assessment_(\d{8}_\d{6})$') {
         $caName = $Matches[1]
         $timestamp = $Matches[2]

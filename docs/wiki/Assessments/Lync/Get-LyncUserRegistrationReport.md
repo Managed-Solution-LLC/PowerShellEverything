@@ -381,9 +381,9 @@ $completeness = ($withLineURI / $voiceEnabled) * 100
 ```
 
 ## Related Scripts
-- [Start-LyncCsvExporter.ps1](Start-LyncCsvExporter.md) - Export user data to CSV for analysis
-- [Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md) - Complete environment assessment
-- [Export-ADLyncTeamsMigrationData.ps1](Export-ADLyncTeamsMigrationData.md) - AD attribute export for migration
+- [Start-LyncCsvExporter.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-LyncCsvExporter) - Export user data to CSV for analysis
+- [Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport) - Complete environment assessment
+- [Export-ADLyncTeamsMigrationData.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADLyncTeamsMigrationData) - AD attribute export for migration
 
 ## Version History
 - **v2.0** (2025-09-17): Enhanced registration reporting

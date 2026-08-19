@@ -29,7 +29,7 @@ This folder contains scripts for assessing on-premise Windows Server infrastruct
 .\Get-ComprehensiveADReport.ps1 -OutputDirectory "C:\Migration\SourceAD" -IncludeDisabledUsers -IncludeComputers
 
 # Query specific domain
-.\Get-ComprehensiveADReport.ps1 -Domain "sachicis.org" -OrganizationName "SACHICIS"
+.\Get-ComprehensiveADReport.ps1 -Domain "contoso.com" -OrganizationName "Contoso"
 
 # Cross-forest with credentials
 .\Get-ComprehensiveADReport.ps1 -Domain "partner.com" -Credential (Get-Credential)
@@ -155,7 +155,7 @@ Directory where reports are saved.
 # Specific OU assessment
 
 # Query different domain
-.\Get-ComprehensiveADReport.ps1 -Domain "sachicis.org" -OrganizationName "SACHICIS"
+.\Get-ComprehensiveADReport.ps1 -Domain "contoso.com" -OrganizationName "Contoso"
 
 # Cross-forest assessment
 $Cred = Get-Credential

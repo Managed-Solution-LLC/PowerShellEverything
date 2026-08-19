@@ -1,365 +1,294 @@
-# Get-PBIWorkspaceUsageReport
+# Get-PBIWorkspaceUsageReport — Quick Usage Guide
 
-## Overview
-
-`Get-PBIWorkspaceUsageReport.ps1` generates a comprehensive Power BI workspace and report usage report. It inventories all reports across all workspaces (including personal workspaces), correlates them with Power BI Activity Log data for the last 30 days by default (up to 90 days for Fabric/Premium capacities), and produces a detailed usage analysis showing view counts and unique users per report. Supports both Service Principal and interactive user authentication. Outputs in CSV or JSON format.
-
-## API Reference
-
-This script communicates with three distinct API surfaces depending on the authentication mode used.
-
-### 1. Microsoft Identity Platform — Token Endpoint
-
-Used to acquire OAuth 2.0 bearer tokens for all non-interactive authentication modes.
-
-| Property | Value |
-|----------|-------|
-| **URL** | `https://login.microsoftonline.com/{TenantId}/oauth2/v2.0/token` |
-| **Method** | `POST` |
-| **Content-Type** | `application/x-www-form-urlencoded` |
-| **Scope** | `https://analysis.windows.net/powerbi/api/.default` |
-
-**Grant types used:**
-
-| Grant Type | Parameter Set | Description |
-|------------|--------------|-------------|
-| `client_credentials` | `ServicePrincipal` | App-only auth using Client ID + Client Secret |
-| `password` (ROPC) | `ServiceAccount` | Delegated auth using a service account UPN + password. Requires "Allow public client flows" enabled on the app registration. |
+> **v1.6 · PowerShell 5.1+ · Python 3.10+**
+> Scripts: `scripts/Graph Commands/Get-PBIWorkspaceUsageReport.ps1` | `.py`
 
 ---
 
-### 2. Power BI Admin REST API
+## Quick Start
 
-Base URL: `https://api.powerbi.com/v1.0/myorg`
+### PowerShell
 
-All endpoints used are under the `/admin/` path, which requires either the **Fabric Administrator** Entra ID role on the calling identity, or the **"Service principals can access read-only admin APIs"** tenant setting enabled in the Fabric Admin Portal.
+```powershell
+# Interactive login (ad-hoc, no app registration needed)
+.\Get-PBIWorkspaceUsageReport.ps1 -TenantId "<tid>" -UseInteractiveAuth
 
-| Endpoint | Operation | Description |
-|----------|-----------|-------------|
-| `GET /admin/groups?$expand=reports,datasets&$top=5000` | Admin — GetGroupsAsAdmin | Returns all workspaces in the tenant including personal workspaces, with their reports and datasets expanded. `StorageUsedMB` is populated for Premium/Fabric capacity workspaces only. Paginated via `odata.nextLink`. |
-| `GET /admin/activityevents?startDateTime=...&endDateTime=...&$filter=Activity eq 'ViewReport'` | Admin — ActivityEvents | Returns Power BI activity log events for a single UTC day. The script loops day-by-day over the configured `ActivityDays` window. Paginated via `continuationUri` / `continuationToken`. |
+# Service Principal (automated / pipeline)
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "<tid>" -ClientId "<cid>" -ClientSecret "<secret>"
 
-**Pagination:** Both endpoints are paged. The wrapper `Invoke-PBIRestMethod` follows `odata.nextLink`, `continuationUri`, and `continuationToken` automatically.
+# Service account / ROPC (when SP is blocked at the PBI service layer)
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "<tid>" -ClientId "<cid>" `
+    -Username "svc-pbi@domain.com" -Password (ConvertTo-SecureString $env:SVC_PBI_PASSWORD -AsPlainText -Force)
 
-**Rate limiting:** The script handles HTTP `429 Too Many Requests` with an automatic retry after the `Retry-After` interval, plus a 200 ms courtesy delay between activity log day-requests.
+# Custom output path, JSON format, 60-day window, include refresh history
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "<tid>" -ClientId "<cid>" -ClientSecret "<secret>" `
+    -OutputPath "C:\Reports\PBI" -OutputFormat json -ActivityDays 60 -IncludeRefreshHistory
 
-**Retention note:** The activity log endpoint returns `400 Bad Request` for dates outside the tenant's retention window (30 days for standard tenants; up to 90 days for Fabric/Premium). Out-of-range days are skipped automatically.
+# Upload reports to S3 after generation
+.\Get-PBIWorkspaceUsageReport.ps1 `
+    -TenantId "<tid>" -ClientId "<cid>" -ClientSecret "<secret>" `
+    -PublishToS3 -S3BucketName "my-pbi-reports" -S3KeyPrefix "powerbi/monthly" -S3Region "us-east-1"
+```
+
+### Python
+
+```bash
+# Install dependencies once
+pip install -r "scripts/Graph Commands/requirements.txt"
+
+# Service Principal
+python Get-PBIWorkspaceUsageReport.py \
+    --tenant-id <tid> --client-id <cid> --client-secret <secret>
+
+# Interactive device-code flow (browser)
+python Get-PBIWorkspaceUsageReport.py \
+    --tenant-id <tid> --client-id <cid> --interactive
+
+# ROPC / service account
+python Get-PBIWorkspaceUsageReport.py \
+    --tenant-id <tid> --client-id <cid> \
+    --username svc@domain.com --password <pw>
+
+# With refresh history + upload to S3
+python Get-PBIWorkspaceUsageReport.py \
+    --tenant-id <tid> --client-id <cid> --client-secret <secret> \
+    --include-refresh-history \
+    --s3-bucket my-pbi-reports --s3-prefix "powerbi/$(date +%Y-%m)" --s3-region us-east-1
+```
 
 ---
-
-### 3. MicrosoftPowerBIMgmt PowerShell Module (Interactive Auth only)
-
-Used exclusively when `-UseInteractiveAuth` is specified. These are PowerShell cmdlet wrappers over the same Power BI REST API surfaces above.
-
-| Cmdlet | Description |
-|--------|-------------|
-| `Login-PowerBI` | Opens a browser-based interactive login prompt and establishes a Power BI session. |
-| `Get-PowerBIAccessToken` | Returns the current bearer token from the active session. Used to reuse an existing session without re-prompting. |
-| `Get-PowerBIActivityEvent -StartDateTime ... -EndDateTime ...` | Wraps the activity events REST endpoint. Returns raw JSON; the script converts and filters to `ViewReport` events client-side. |
-
-**Module requirement:** `Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser`
-
----
-
-## Features
-
-- **Full Workspace Inventory** - Enumerates all shared and personal workspaces using Power BI Admin APIs
-- **Activity Log Correlation** - Matches reports with `ViewReport` events from the Power BI Activity Log
-- **Usage Metrics** - View counts and unique user lists per report for configurable time periods
-- **User Detail Report** - Per-user view counts per report for granular access analysis
-- **Stale Report Identification** - Reports with zero views are surfaced for potential cleanup
-- **CSV and JSON Export** - Choose output format; JSON uses proper arrays for user lists
-- **Pre-Flight Validation** - Validates PowerShell version, output directory, and write permissions before starting
-- **Dual Authentication Modes** - Service Principal (client credentials) for automated/pipeline use, or interactive browser login via `-UseInteractiveAuth` for ad-hoc runs
-
-## Prerequisites
-
-### PowerShell Version
-- **PowerShell 5.1 or later** (validated at runtime)
-
-### Required Permissions
-
-The script calls Power BI `/admin/` endpoints. Three things must all be in place:
-
-#### 1. Entra App Registration Permissions
-Add the following API permissions to the app registration in [Entra ID](https://entra.microsoft.com) and grant admin consent:
-
-| API | Permission | Type |
-|-----|-----------|------|
-| Power BI Service | `Tenant.Read.All` | Application |
-
-#### 2. Fabric Admin RBAC Role (required to access Admin Portal settings)
-The person configuring the Fabric tenant settings must hold the **Fabric Administrator** (or Global Administrator) role in Entra ID.
-
-> Without this role, the [Fabric Admin Portal](https://app.powerbi.com/admin-portal/tenantSettings) tenant settings will not be accessible or editable.
-
-To assign the role:  
-**Entra ID → Roles and administrators → Fabric Administrator → Add assignment**
-
-#### 3. Fabric Admin Portal — Admin API Settings
-Once you have the Fabric Administrator role, navigate to:
-
-**[https://app.powerbi.com/admin-portal/tenantSettings](https://app.powerbi.com/admin-portal/tenantSettings)**
-
-Scroll to the **Admin API settings** section and configure:
-
-- **Setting:** "Service principals can access read-only admin APIs"
-- **Toggle:** Enabled
-- **Apply to:** Specific security groups
-- **Action:** Add the security group that contains your app registration's service principal
-
-> ⚠️ **Common confusion:** "Service principals can call Fabric public APIs" (under Developer settings) is a **different setting** that covers regular endpoints only. The `/admin/` endpoints used by this script require the **Admin API settings** toggle above.
-
-### Azure App Registration Setup (Service Principal auth)
-1. Register an App in Entra ID
-2. Create a client secret
-3. Grant `Tenant.Read.All` (Power BI Service) with admin consent
-4. Add the service principal to the security group allowed in the Admin API settings above
-5. No Microsoft Graph API permissions are needed — only Power BI REST API access
-
-### Interactive Authentication (`-UseInteractiveAuth`)
-Use this for ad-hoc runs or while Service Principal permissions are still propagating.
-
-**Requirements:**
-- The `MicrosoftPowerBIMgmt` PowerShell module: `Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser`
-- Sign in with a **Power BI Administrator** or **Fabric Administrator** account
-- `TenantId` is still required; `ClientId` and `ClientSecret` are not used
-
-> ℹ️ The same Admin API settings (above) apply — the signed-in user account must have Power BI Admin access to the tenant.
-
-### Output Directory
-- Write permissions to the `OutputPath` directory (validated at runtime)
 
 ## Parameters
 
-### TenantId
-**Type:** String  
-**Required:** Yes  
-**Description:** Azure AD / Entra ID Tenant ID.
+### PowerShell
 
-### ClientId
-**Type:** String  
-**Required:** Yes *(Service Principal auth only)*  
-**Description:** App Registration (Service Principal) Client ID. Not used when `-UseInteractiveAuth` is specified.
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `-TenantId` | Yes | — | Entra ID Tenant ID |
+| `-ClientId` | SP / ROPC | — | App Registration Client ID |
+| `-ClientSecret` | SP only | — | App Registration Client Secret |
+| `-UseInteractiveAuth` | Interactive only | — | Browser login via `MicrosoftPowerBIMgmt` module |
+| `-Username` | ROPC only | — | Service account UPN |
+| `-Password` | ROPC only | — | Service account password (`SecureString`) |
+| `-OutputPath` | No | `.` | Output directory (created if missing) |
+| `-OutputFormat` | No | `csv` | `csv` or `json` |
+| `-ActivityDays` | No | `30` | Days of activity history (max 90, standard retention = 30) |
+| `-IncludeRefreshHistory` | No | off | Fetch last refresh per dataset (one extra API call each) |
+| `-PublishToS3` | No | off | Upload all generated report files to S3 after local export |
+| `-S3BucketName` | When `-PublishToS3` | — | Target S3 bucket name |
+| `-S3KeyPrefix` | No | `""` | S3 key prefix (virtual folder path) e.g. `pbi-reports/monthly` |
+| `-S3Region` | No | — | AWS region override; uses default AWS config if omitted |
+| `-S3ProfileName` | No | — | Named AWS CLI credentials profile |
 
-### ClientSecret
-**Type:** String  
-**Required:** Yes *(Service Principal auth only)*  
-**Description:** App Registration Client Secret. For production use, retrieve from Azure Key Vault rather than hardcoding. Not used when `-UseInteractiveAuth` is specified.
+### Python
 
-### UseInteractiveAuth
-**Type:** Switch  
-**Required:** No  
-**Description:** Use interactive browser login instead of a service principal client secret. Requires the `MicrosoftPowerBIMgmt` module. When specified, `ClientId` and `ClientSecret` are not needed. `TenantId` is still required.
+| Argument | Required | Default | Description |
+|---|---|---|---|
+| `--tenant-id` | Yes | — | Entra ID Tenant ID |
+| `--client-id` | Yes | — | App Registration Client ID |
+| `--client-secret` | SP only | — | Mutually exclusive with `--interactive` / `--password` |
+| `--interactive` | — | — | Device-code flow (browser) |
+| `--password` | ROPC only | — | Requires `--username` |
+| `--username` | ROPC only | — | Service account UPN |
+| `--output-path` | No | `.` | Output directory |
+| `--output-format` | No | `csv` | `csv` or `json` |
+| `--activity-days` | No | `30` | Days of activity (max 30 standard, 90 Fabric/Premium) |
+| `--include-refresh-history` | No | off | Fetch last refresh per refreshable dataset |
+| `--s3-bucket` | No | — | S3 bucket — triggers upload when set |
+| `--s3-prefix` | No | `""` | S3 key prefix e.g. `powerbi/2026-04` |
+| `--s3-region` | No | — | AWS region override |
+| `--s3-profile` | No | — | Named AWS credentials profile |
+| `--s3-kms-key` | No | — | KMS key ID/ARN for SSE-KMS encryption |
+| `--s3-storage-class` | No | `STANDARD` | `STANDARD`, `INTELLIGENT_TIERING`, `GLACIER`, etc. |
 
-### OutputPath
-**Type:** String  
-**Required:** No  
-**Default:** `.` (current directory)  
-**Description:** Directory where all output files will be written. The directory will be created if it doesn't exist. Write permissions are validated before execution begins.
-
-### OutputFormat
-**Type:** String  
-**Required:** No  
-**Default:** `csv`  
-**Valid Values:** `csv`, `json`  
-**Description:** Output file format. JSON includes proper arrays for user lists and pretty-printed formatting.
-
-### ActivityDays
-**Type:** Integer  
-**Required:** No  
-**Default:** `30`  
-**Valid Range:** 1–90  
-**Description:** Number of days of Power BI activity history to retrieve. Standard Power BI audit log retains **30 days**; tenants with Fabric or Premium capacity may retain up to 90 days. Requesting dates outside the tenant's retention window returns a 400 error (skipped automatically per day).
-
-## Usage Examples
-
-### Example 1: Interactive Auth (Recommended for Ad-Hoc Use)
-```powershell
-.\Get-PBIWorkspaceUsageReport.ps1 `
-    -TenantId "12345678-1234-1234-1234-123456789012" `
-    -UseInteractiveAuth `
-    -OutputPath "C:\Reports\PBI" `
-    -OutputFormat "json"
-```
-Opens a browser login prompt. Use a Power BI Administrator account. No app registration needed.
-
-### Example 2: Service Principal (Automated / Pipeline Use)
-```powershell
-.\Get-PBIWorkspaceUsageReport.ps1 `
-    -TenantId "12345678-1234-1234-1234-123456789012" `
-    -ClientId "abcdefab-1234-1234-1234-abcdefabcdef" `
-    -ClientSecret "your-client-secret"
-```
-
-### Example 3: Extended Window (Fabric/Premium Tenants)
-```powershell
-.\Get-PBIWorkspaceUsageReport.ps1 `
-    -TenantId "12345678-1234-1234-1234-123456789012" `
-    -UseInteractiveAuth `
-    -OutputPath "C:\Reports\PowerBI" `
-    -ActivityDays 90
-```
-> ⚠️ Only use `-ActivityDays` values above 30 if the tenant has Fabric or Premium capacity with extended audit retention. Standard tenants will see per-day failures for dates beyond 30 days (skipped automatically).
-
-### Example 4: Identify Stale Reports
-```powershell
-# Run report
-.\Get-PBIWorkspaceUsageReport.ps1 `
-    -TenantId "12345678-1234-1234-1234-123456789012" `
-    -UseInteractiveAuth `
-    -OutputPath "C:\Reports\PowerBI"
-
-# Filter stale reports from the usage CSV
-$usage = Import-Csv "C:\Reports\PowerBI\PBI_Report_Usage_*.csv"
-$stale = $usage | Where-Object { [int]$_.TotalViews_90d -eq 0 }
-Write-Host "Stale reports (0 views in last 30 days): $($stale.Count)"
-$stale | Select-Object ReportName, WorkspaceName, WorkspaceType | Format-Table
-```
+---
 
 ## Output Files
 
-All output files include a timestamp suffix (`YYYYMMDD_HHmmss`) to prevent overwrites.
+All files are timestamped `YYYYMMDD_HHmmss` to prevent overwrites.
 
-### Report Inventory (`PBI_Report_Inventory_<timestamp>.<ext>`)
-Full inventory of all reports across all workspaces.
+| File | Description |
+|---|---|
+| `PBI_Report_Inventory_*.csv/json` | Every report in the tenant — workspace, type, state, storage proxy fields |
+| `PBI_Workspace_Size_*.csv/json` | One row per workspace — `StorageUsedMB` (Premium/Fabric only), dataset count, report count |
+| `PBI_Dataset_Health_*.csv/json` | One row per dataset — `TargetStorageMode`, `StorageCategory`, `IsRefreshable`, gateway flag, configured-by |
+| `PBI_Report_Usage_*.csv/json` | Per-report usage — total views, unique users, user list, device type breakdown |
+| `PBI_Report_UserDetails_*.csv/json` | Per-user per-report — view count, last viewed timestamp |
+| `PBI_DeviceType_Summary_*.csv/json` | Tenant-wide device type counts — Web, Desktop, Mobile, Excel, etc. |
+| `PBI_Usage_Summary_*.txt` | Human-readable summary — top workspaces, top reports, device breakdown, storage mode breakdown |
 
-| Column | Description |
-|--------|-------------|
-| ReportId | Power BI Report GUID |
-| ReportName | Display name of the report |
-| WorkspaceId | Power BI Workspace GUID |
-| WorkspaceName | Display name of the workspace |
-| WorkspaceType | `Shared` or `Personal` |
+### Key Columns — Dataset Health
 
-### Usage Summary (`PBI_Report_Usage_<timestamp>.<ext>`)
-Per-report usage aggregation sorted by most-viewed.
+| Column | Details |
+|---|---|
+| `TargetStorageMode` | Raw API value: `Abf`, `DirectQuery`, `PremiumFiles`, `CompositeModel`, `Streaming` |
+| `StorageCategory` | Human-readable: `Import (In-Memory)`, `DirectQuery (No Memory)`, `Composite`, etc. |
+| `IsRefreshable` | Whether the dataset supports scheduled refresh |
+| `IsOnPremGatewayRequired` | Whether an on-prem data gateway is required |
+| `LastRefreshStart/End` | Populated only when `-IncludeRefreshHistory` is set |
+| `LastRefreshDurationMin` | Calculated refresh duration in minutes (proxy for dataset size/complexity) |
+| `LastRefreshStatus` | `Completed`, `Failed`, or `Unknown` |
 
-| Column | Description |
-|--------|-------------|
-| ReportId | Power BI Report GUID |
-| ReportName | Display name of the report |
-| WorkspaceName | Workspace containing the report |
-| WorkspaceType | `Shared` or `Personal` |
-| TotalViews_90d | Total ViewReport events in the activity window |
-| UniqueUsers_90d | Count of distinct users who viewed |
-| UserList_90d | Semicolon-delimited list of user IDs (CSV) or JSON array (JSON format) |
-| DatasetId | Power BI Dataset GUID backing the report |
-| ReportWebUrl | Direct URL to open the report in Power BI Service |
+> **Memory note:** `StorageUsedMB` (workspace-level) and `StorageCategory` (dataset-level) are the closest proxies available via the REST API. Byte-level dataset memory requires XMLA DMV queries on Premium/Fabric (`DISCOVER_OBJECT_MEMORY_USAGE`).
 
-### User Details (`PBI_Report_UserDetails_<timestamp>.<ext>`)
-Per-user, per-report view counts.
+---
 
-| Column | Description |
-|--------|-------------|
-| ReportId | Power BI Report GUID |
-| ReportName | Display name of the report |
-| UserId | Azure AD User UPN or Object ID |
-| ViewCount_90d | Number of times this user viewed the report |
-| LastViewed | Timestamp of the user's most recent view event |
-| WorkspaceName | Workspace containing the report |
-| WorkspaceType | `Shared` or `Personal` |
+## Permissions Setup
 
-### Summary Text (`PBI_Usage_Summary_<timestamp>.txt`)
-Human-readable summary including:
-- Total reports, shared vs. personal breakdown
-- Reports with and without usage
-- Total view events and unique users
-- Top 10 most-viewed reports
+Three things must all be in place for the `/admin/` endpoints to work:
 
-### Console Output
+### 1. App Registration (Service Principal auth)
+
+| API | Permission | Type |
+|---|---|---|
+| Power BI Service | `Tenant.Read.All` | Application |
+
+Admin consent required.
+
+### 2. Assign Fabric Administrator Role to the SP *(fastest)*
+
 ```
-═══════════════════════════════════════════════════════════════
-  Power BI Workspace Usage Report - Phase 1
-  Managed Solution
-  Output Format: CSV
-═══════════════════════════════════════════════════════════════
-
-[INVENTORY] Report Inventory Summary:
-  Total Reports       : 412
-  Shared Workspace    : 387
-  Personal Workspace  : 25
-
-✅ [EXPORT] Report inventory  -> C:\Reports\PowerBI\PBI_Report_Inventory_20260313_143052.csv
-...
-✅ [DONE] All reports generated successfully.
+Entra ID → Roles and administrators → Fabric Administrator → Add assignment
 ```
 
-## Common Issues & Troubleshooting
+**OR** use the Fabric Admin Portal setting instead (Option B below).
 
-### Issue: "Unauthorized" / 401 on Power BI API
-**Root Cause:**  
-The script calls `/admin/` endpoints. `Tenant.Read.All` being granted and the "Service principals can call Fabric public APIs" setting being enabled is **not sufficient** — the Admin API setting is controlled by a separate toggle.
+### 3. Fabric Admin Portal — Admin API Settings *(Option B)*
 
-**Resolution steps:**
+Navigate to **Fabric Admin Portal → Tenant settings → Admin API settings**
 
-**Step 1 — Verify you have Fabric Admin access to configure tenant settings:**  
-The person making changes must hold the **Fabric Administrator** (or Global Administrator) role.  
-> Entra ID → Roles and administrators → Fabric Administrator → Add assignment
-
-**Step 2 — Enable Admin API access in the Fabric Admin Portal:**  
-Navigate to: **[https://app.powerbi.com/admin-portal/tenantSettings](https://app.powerbi.com/admin-portal/tenantSettings)**  
-
-Scroll to **Admin API settings** and configure:
 - Enable: **"Service principals can access read-only admin APIs"**
-- Set **Apply to:** Specific security groups
-- Add the security group containing your app registration's service principal
+- Scope to the security group containing the SP
 
-> ⚠️ **Common confusion:** "Service principals can call Fabric public APIs" (Developer settings) covers regular/public endpoints only — it does **not** grant access to `/admin/` endpoints used by this script.
+> **Common confusion:** "Service principals can call Fabric public APIs" (Developer settings) is a **different toggle** — it covers public endpoints, not `/admin/` endpoints.
 
-### Issue: No workspaces returned
-**Cause:** Insufficient Power BI admin permissions.
+### Interactive auth (`-UseInteractiveAuth` / `--interactive`)
 
-**Solution:** Verify the service principal has `Tenant.Read.All` in Power BI and admin API access is enabled.
-
-### Issue: Activity log returns empty results or per-day failures
-**Cause:**  
-- Standard Power BI audit log retains only **30 days** of data. Requesting dates older than 30 days returns 400 errors (the script skips those days automatically and reports a count at the end)
-- Tenant may have activity logging disabled
-
-**Solution:**  
-- Use the default `ActivityDays 30` or explicitly pass `-ActivityDays 30` for standard tenants
-- Only use higher values (up to 90) if the tenant has **Fabric or Premium capacity** with extended retention
-- Verify Power BI activity logging is enabled in the Power BI Admin Portal
-
-### Issue: Pre-flight validation fails (PowerShell version)
-**Cause:** Running on PowerShell 5.0 or earlier.
-
-**Solution:**
 ```powershell
-# Check your version
-$PSVersionTable.PSVersion
-
-# Upgrade to PowerShell 5.1 or install PowerShell 7
+Install-Module MicrosoftPowerBIMgmt -Scope CurrentUser
 ```
 
-### Issue: Write permission denied for OutputPath
-**Cause:** Account doesn't have write access to the output directory.
+Sign in with a **Power BI Administrator** or **Fabric Administrator** account. No app registration needed.
 
-**Solution:** Specify a writable directory:
+### ROPC / Service Account
+
+- Account must have **Power BI Administrator** Entra role
+- Account must **not** have MFA or device-compliance Conditional Access
+- App registration must have **"Allow public client flows" = Yes**
+  `Entra ID → App registrations → [App] → Authentication → Advanced settings`
+
+---
+
+## S3 Upload
+
+Both the PowerShell and Python versions support uploading all generated report files to an Amazon S3 bucket.
+
+### PowerShell
+
+Requires `AWS.Tools.S3` (or the monolithic `AWSPowerShell`) module. Credentials are resolved via the standard AWS credential chain (environment variables, `~/.aws/credentials`, instance profile).
+
 ```powershell
--OutputPath "$env:USERPROFILE\Documents\PBI_Reports"
+Install-Module AWS.Tools.S3 -Scope CurrentUser
 ```
 
-## Performance Considerations
+```powershell
+# Basic upload
+.\Get-PBIWorkspaceUsageReport.ps1 ... `
+    -PublishToS3 -S3BucketName "my-pbi-reports" -S3KeyPrefix "powerbi/2026-05"
 
-- **ActivityDays:** Shorter periods reduce API calls significantly. Start with 30 days to validate.
-- **Large Tenants:** Tenants with 1000+ reports and many users may take 20–30 minutes to complete.
-- **Rate Limiting:** Built-in `$ProgressPreference = "SilentlyContinue"` speeds up API calls. The Power BI Activity API is paginated hourly and may take time on large tenants.
+# Using a named AWS profile and specific region
+.\Get-PBIWorkspaceUsageReport.ps1 ... `
+    -PublishToS3 -S3BucketName "my-pbi-reports" `
+    -S3KeyPrefix "powerbi/2026-05" -S3Region "us-west-2" -S3ProfileName "prod-profile"
+```
 
-## Related Scripts
+### Python
 
-- [[Get-EnterpriseAppUsage]] - Similar usage pattern for Azure AD app registrations
+AWS credentials are resolved automatically via the standard boto3 chain:
+1. `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment variables
+2. `~/.aws/credentials` named profile (`--s3-profile`)
+3. EC2 / ECS / Lambda instance role
+
+```bash
+# Basic upload
+python Get-PBIWorkspaceUsageReport.py ... \
+    --s3-bucket my-pbi-reports --s3-prefix powerbi/2026-04
+
+# With KMS encryption and Intelligent-Tiering
+python Get-PBIWorkspaceUsageReport.py ... \
+    --s3-bucket my-pbi-reports \
+    --s3-prefix powerbi/2026-04 \
+    --s3-kms-key alias/pbi-reports \
+    --s3-storage-class INTELLIGENT_TIERING
+
+# Using a named AWS profile
+python Get-PBIWorkspaceUsageReport.py ... \
+    --s3-bucket my-pbi-reports \
+    --s3-profile my-aws-profile
+```
+
+All 7 output files (+ summary text) are uploaded. S3 failures are reported per-file and do not abort the run.
+
+---
+
+## Common Issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `401 Unauthorized` | Admin API tenant setting not enabled | Enable "Service principals can access read-only admin APIs" in Fabric Admin Portal |
+| `0 workspaces returned` | Insufficient PBI permissions | Verify `Tenant.Read.All` + admin API gate |
+| `0 activity events` / per-day 400 errors | Dates outside retention window | Use `--activity-days 30`; only go higher on Fabric/Premium |
+| `AADSTS50076` (MFA) | ROPC blocked by MFA policy | Exclude service account from MFA CA, or use `-UseInteractiveAuth` |
+| `AADSTS90010` (public client) | ROPC app not configured | Enable "Allow public client flows" on app registration |
+| `StorageUsedMB` is null | Shared-capacity workspace | Expected — only populated for Premium/Fabric workspaces |
+| Device types all "Unknown" | `ClientType` used (wrong field) | Fixed in v1.4 — uses `ConsumptionMethod` / `UserAgent` parsing |
+| `pip install boto3` error | S3 feature not needed | Omit `--s3-bucket` to skip upload entirely |
+| `AWS.Tools.S3 module required` | PS S3 module missing | `Install-Module AWS.Tools.S3 -Scope CurrentUser` |
+
+---
+
+## Identify Stale Reports
+
+```powershell
+# PowerShell — filter zero-view reports from the usage CSV
+$usage = Import-Csv "C:\Reports\PBI\PBI_Report_Usage_*.csv" | Select-Object -Last 1 -ExpandProperty PSPath |
+    ForEach-Object { Import-Csv $_ }
+$stale = Import-Csv (Get-ChildItem "C:\Reports\PBI\PBI_Report_Usage_*.csv" | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+        | Where-Object { [int]$_.TotalViews_90d -eq 0 }
+Write-Host "Stale reports: $($stale.Count)"
+$stale | Select-Object ReportName, WorkspaceName, WorkspaceType | Format-Table
+```
+
+```python
+# Python — find stale reports
+import csv
+with open("PBI_Report_Usage_20260403_120000.csv") as f:
+    stale = [r for r in csv.DictReader(f) if int(r["TotalViews_90d"]) == 0]
+print(f"Stale reports: {len(stale)}")
+```
+
+---
 
 ## Version History
 
-- **v1.0** - Initial release - Core inventory and usage correlation
-- **v1.1** (2026-03-12) - Added pre-flight validation, improved error handling and authentication, Export-Data with verbose logging, and wrapped main auth in try/catch
-- **v1.2.0** (2026-03-20) - Added `-UseInteractiveAuth` switch for interactive login via `MicrosoftPowerBIMgmt` module; switched activity event collection to `Get-PowerBIActivityEvent` cmdlet with client-side `ViewReport` filtering; changed default `ActivityDays` from 90 to 30 to match standard Power BI audit retention
+| Version | Date | Changes |
+|---|---|---|
+| **v1.6.0** | 2026-05-07 | PowerShell S3 upload — `-PublishToS3`, `-S3BucketName`, `-S3KeyPrefix`, `-S3Region`, `-S3ProfileName` (requires `AWS.Tools.S3`) |
+| **v1.5.1** | 2026-04-03 | Python port — S3 upload (`upload_to_s3`), all PS features parity |
+| **v1.5.0** | 2026-04-03 | Dataset health export (`PBI_Dataset_Health`): `TargetStorageMode`, `StorageCategory`, `IsRefreshable`, gateway flag; `-IncludeRefreshHistory` switch for last refresh per dataset |
+| **v1.4.0** | 2026-03-31 | Workspace size export (`PBI_Workspace_Size`): `StorageUsedMB`, dataset/report count; Device type breakdown using `ConsumptionMethod` / `UserAgent` (fixes `ClientType` not-a-field bug) |
+| **v1.3.0** | 2026-03-26 | ROPC / service account auth (`-Username` / `-Password`) |
+| **v1.2.0** | 2026-03-20 | `-UseInteractiveAuth` via `MicrosoftPowerBIMgmt`; default `ActivityDays` 90 → 30 |
+| **v1.1.0** | 2026-03-12 | Pre-flight validation, improved error handling, verbose logging |
+| **v1.0.0** | — | Initial release — core inventory + usage correlation |
+
+---
 
 ## See Also
 
-- [Power BI Admin REST API](https://docs.microsoft.com/rest/api/power-bi/admin)
-- [Power BI Activity Log](https://docs.microsoft.com/power-bi/admin/service-admin-auditing)
-- [Allow Service Principals to Use Power BI APIs](https://docs.microsoft.com/power-bi/admin/enable-service-principal-access-api)
-- [Get-PBIWorkspaceUsageReport.ps1 Source](https://github.com/Managed-Solution-LLC/PowerShellEverything/blob/main/scripts/Graph%20Commands/Get-PBIWorkspaceUsageReport.ps1)
+- [`PBI-Admin-API-Reference.md`](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/PBI-Admin-API-Reference) — full field-level reference for every Admin API endpoint used
+- [Power BI Admin REST API docs](https://learn.microsoft.com/en-us/rest/api/power-bi/admin)
+- [Power BI Activity Log](https://learn.microsoft.com/en-us/power-bi/admin/service-admin-auditing)

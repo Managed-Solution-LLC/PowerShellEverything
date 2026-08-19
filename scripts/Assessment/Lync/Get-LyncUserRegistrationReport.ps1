@@ -195,7 +195,7 @@ try {
     $Report += ""
 }
 
-# Section 4: User Sessions and Activity (Fixed for CVESD environment)
+# Section 4: User Sessions and Activity
 $Report += "USER SESSIONS AND ACTIVITY"
 $Report += $Separator
 try {

@@ -305,8 +305,8 @@ This is expected behavior - indicates 1 out of 1 user is being processed.
 4. Consider batching for very large tenants (5,000+ users)
 
 ## Related Scripts
-- [Get-MailboxPermissionsReport.ps1](./Get-MailboxPermissionsReport.md) - Audit mailbox delegation
-- [Get-QuickO365Report.ps1](./Get-QuickO365Report.md) - Comprehensive M365 assessment
+- [Get-MailboxPermissionsReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxPermissionsReport) - Audit mailbox delegation
+- [Get-QuickO365Report.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-QuickO365Report) - Comprehensive M365 assessment
 
 ## Version History
 - **v1.0** (2022-11): Initial release

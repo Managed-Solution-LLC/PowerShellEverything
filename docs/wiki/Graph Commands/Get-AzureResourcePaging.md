@@ -17,7 +17,7 @@
 - PowerShell 5.1 or later
 
 ### Dependencies
-- An authenticated headers hashtable from [[Get-GraphHeaders]]
+- An authenticated headers hashtable from [Get-GraphHeaders](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphHeaders)
 - Network access to the Microsoft Graph or Azure REST API endpoint
 
 ## Parameters
@@ -141,9 +141,9 @@ for ($i = 0; $i -lt $maxRetries; $i++) {
 
 ## Related Scripts
 
-- [[Get-GraphToken]] - Acquire the access token needed for headers
-- [[Get-GraphHeaders]] - Build the AuthHeader parameter
-- [[Get-EnterpriseAppUsage]] - Uses this function for app enumeration
+- [Get-GraphToken](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphToken) - Acquire the access token needed for headers
+- [Get-GraphHeaders](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-GraphHeaders) - Build the AuthHeader parameter
+- [Get-EnterpriseAppUsage](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-EnterpriseAppUsage) - Uses this function for app enumeration
 
 ## Version History
 

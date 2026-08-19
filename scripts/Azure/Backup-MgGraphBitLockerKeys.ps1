@@ -10,6 +10,9 @@
     This script connects to Microsoft Graph, retrieves all Azure AD devices, and exports all BitLocker recovery keys for each device.
     The results are saved as a CSV file. The script will install the Microsoft.Graph module if it is not already present.
 
+    SECURITY NOTE: The output CSV contains plaintext BitLocker recovery keys. Store it in a secured,
+    access-controlled location, delete it when no longer needed, and never commit it to source control.
+
 .PARAMETER None
     All configuration is handled within the script. You may edit the export path as needed.
 
@@ -70,7 +73,10 @@ foreach ($device in $devices) {
                     RecoveryKey = $keyInfo.Key  # This is the actual recovery password
                     VolumeType = $keyInfo.VolumeType
                 }
-                Write-Host "$keyDetails"
+                # Note: intentionally not writing $keyDetails to the host/console - it contains the
+                # plaintext BitLocker recovery key, which should never be echoed to a terminal or
+                # transcript. It is only written to the protected CSV output path below.
+                Write-Host "Retrieved recovery key for device $($device.DisplayName) (key id: $keyId)"
                 $allBitlockerKeys += $keyDetails
             }
         }

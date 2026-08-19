@@ -5,20 +5,20 @@ This directory contains comprehensive assessment and reporting tools for Lync/Sk
 ## Available Scripts
 
 ### Data Export Tools
-- **[Start-LyncCsvExporter.ps1](Start-LyncCsvExporter.md)** - Interactive menu-driven CSV export tool
+- **[Start-LyncCsvExporter.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-LyncCsvExporter)** - Interactive menu-driven CSV export tool
   - User data exports (Summary, Voice, SBA, Complete)
   - Phone/device inventory (Common area phones, Analog devices, USB devices)
   - Infrastructure exports (Pools, Policies)
   - Bulk export operations
 
-- **[Export-ADLyncTeamsMigrationData.ps1](Export-ADLyncTeamsMigrationData.md)** - Active Directory export for Teams migration
+- **[Export-ADLyncTeamsMigrationData.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADLyncTeamsMigrationData)** - Active Directory export for Teams migration
   - AD user attributes for migration analysis
   - Lync-specific attribute capture
   - Voice routing and SIP address export
   - Teams migration readiness assessment
 
 ### Comprehensive Reports
-- **[Get-ComprehensiveLyncReport.ps1](Get-ComprehensiveLyncReport.md)** - Complete environment assessment
+- **[Get-ComprehensiveLyncReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-ComprehensiveLyncReport)** - Complete environment assessment
   - Executive summary with key metrics
   - Pool architecture analysis
   - Certificate health monitoring
@@ -27,7 +27,7 @@ This directory contains comprehensive assessment and reporting tools for Lync/Sk
   - Infrastructure recommendations
 
 ### Health & Diagnostics
-- **[Get-LyncHealthReport.ps1](Get-LyncHealthReport.md)** - Health monitoring and diagnostics
+- **[Get-LyncHealthReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncHealthReport)** - Health monitoring and diagnostics
   - Certificate expiration tracking
   - Database mirror state analysis
   - Event log error analysis
@@ -35,21 +35,21 @@ This directory contains comprehensive assessment and reporting tools for Lync/Sk
   - Lync-specific performance counters
 
 ### Infrastructure Analysis
-- **[Get-LyncInfrastructureReport.ps1](Get-LyncInfrastructureReport.md)** - Infrastructure configuration report
+- **[Get-LyncInfrastructureReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncInfrastructureReport)** - Infrastructure configuration report
   - Pool categorization (Standard, SBA, IVR, Edge)
   - Computer deployment analysis
   - Service configuration review
   - Topology documentation
   - Conference directory inventory
 
-- **[Get-LyncServiceStatus.ps1](Get-LyncServiceStatus.md)** - Service status monitoring
+- **[Get-LyncServiceStatus.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncServiceStatus)** - Service status monitoring
   - Windows service analysis
   - Process performance metrics
   - Service dependency mapping
   - Resource usage reporting
 
 ### User Analysis
-- **[Get-LyncUserRegistrationReport.ps1](Get-LyncUserRegistrationReport.md)** - User registration and activity
+- **[Get-LyncUserRegistrationReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-LyncUserRegistrationReport)** - User registration and activity
   - Registration status analysis
   - User activity tracking
   - Voice enablement statistics
@@ -167,8 +167,8 @@ For large environments:
 
 ## Related Documentation
 
-- [Office 365 Migration Guide](../../Office365-Quick-Start.md)
-- [Lync CSV Exporter Changes](../../Lync-CSV-Exporter-Changes.md)
+- [Office 365 Migration Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Office365-Quick-Start)
+- [Lync CSV Exporter Changes](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Lync-CSV-Exporter-Changes)
 - [Microsoft Lync Server Documentation](https://docs.microsoft.com/en-us/skypeforbusiness/)
 
 ## Support and Contributing

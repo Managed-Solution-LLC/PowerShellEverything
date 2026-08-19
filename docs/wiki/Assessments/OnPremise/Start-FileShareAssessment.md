@@ -332,9 +332,9 @@ Compare-Object $previousReport $currentReport -Property FolderName, FolderSizeGB
 ```
 
 ## Related Scripts
-- [Start-WindowsServerAssessment.ps1](../WindowsServer/Start-WindowsServerAssessment.md) - Complete server infrastructure assessment
-- [Export-ADUsersAndGroups.ps1](../ActiveDirectory/Export-ADUsersAndGroups.md) - Active Directory user and group export
-- [Get-MailboxPermissionsReport.ps1](../../Microsoft365/Get-MailboxPermissionsReport.md) - Office 365 mailbox permissions
+- [Start-WindowsServerAssessment.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Start-WindowsServerAssessment) - Complete server infrastructure assessment
+- [Export-ADUsersAndGroups.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Export-ADUsersAndGroups) - Active Directory user and group export
+- [Get-MailboxPermissionsReport.ps1](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/Get-MailboxPermissionsReport) - Office 365 mailbox permissions
 
 ## Version History
 - **v1.0** (2026-01-05): Initial release
@@ -344,7 +344,7 @@ Compare-Object $previousReport $currentReport -Property FolderName, FolderSizeGB
   - Excel report generation with formatting
 
 ## See Also
-- [On-Premise Assessment Overview](README.md)
-- [File Share Migration Planning Guide](../../guides/FileShareMigration.md)
+- [On-Premise Assessment Overview](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/README)
+- [File Share Migration Planning Guide](https://github.com/Managed-Solution-LLC/PowerShellEverything/wiki/FileShareMigration)
 - [Microsoft Docs: SMB Share Management](https://docs.microsoft.com/en-us/windows-server/storage/file-server/file-server-smb-overview)
 - [ImportExcel Module Documentation](https://github.com/dfinke/ImportExcel)

@@ -14,11 +14,19 @@
 
 .PARAMETER ReportPath
     The file path where the comprehensive report will be saved. If not specified, defaults to
-    "C:\Reports\CVESD_Lync_Comprehensive_[timestamp].txt" in the current directory.
+    "C:\Reports\Lync_Comprehensive_[timestamp].txt" in the current directory.
 
 .PARAMETER OrganizationName
     The name of the organization for which the report is being generated. Used in the report header
     and organizational context throughout the report.
+
+.PARAMETER Domain
+    The primary email/UPN domain for the organization (e.g. "contoso.com"). Used to help categorize
+    pools and identify organization-owned FQDNs. Defaults to the domain portion of PoolFQDN if not specified.
+
+.PARAMETER AdditionalKeyPools
+    An optional array of additional pool FQDNs (beyond PoolFQDN) to highlight in the
+    "Key Infrastructure Pools" section of the report, e.g. edge, web conferencing, or SQL witness pools.
 
 .PARAMETER SBAPattern
     The pattern used to identify Survivable Branch Appliances (SBA) pools. Defaults to "*MSSBA*".
@@ -82,11 +90,17 @@ param(
     [string]$PoolFQDN,
     
     [Parameter(Mandatory=$false, HelpMessage="Path where the report will be saved")]
-    [string]$ReportPath = "C:\Reports\CVESD_Lync_Comprehensive_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt",
-    
+    [string]$ReportPath = "C:\Reports\Lync_Comprehensive_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt",
+
     [Parameter(Mandatory=$false, HelpMessage="Organization name for the report header")]
     [string]$OrganizationName = "Organization",
-    
+
+    [Parameter(Mandatory=$false, HelpMessage="Primary domain for the organization; defaults to the domain portion of PoolFQDN")]
+    [string]$Domain,
+
+    [Parameter(Mandatory=$false, HelpMessage="Additional pool FQDNs to highlight in the key infrastructure section")]
+    [string[]]$AdditionalKeyPools = @(),
+
     [Parameter(Mandatory=$false, HelpMessage="Pattern to identify SBA pools")]
     [string]$SBAPattern = "*MSSBA*",
     
@@ -107,6 +121,11 @@ param(
 # Use provided or default report path if not specified directly
 $Separator = "=" * 80
 
+# Derive the primary domain from the pool FQDN if not explicitly provided
+if (-not $Domain) {
+    $Domain = ($PoolFQDN -split '\.', 2)[1]
+}
+
 # Create reports directory if it doesn't exist
 $ReportsDir = Split-Path $ReportPath -Parent
 if (!(Test-Path $ReportsDir)) {
@@ -115,7 +134,7 @@ if (!(Test-Path $ReportsDir)) {
 
 # Start report
 $Report = @()
-$Report += "CHULA VISTA ELEMENTARY SCHOOL DISTRICT (CVESD)"
+$Report += $OrganizationName.ToUpper()
 $Report += "LYNC/SKYPE FOR BUSINESS ENVIRONMENT REPORT"
 $Report += "Generated: $(Get-Date)"
 $Report += "Server: $($env:COMPUTERNAME)"
@@ -135,7 +154,7 @@ try {
     $Report += "  Total Pools: $($AllPools.Count)"
     $Report += "  Total Certificates: $($Certificates.Count)"
     $Report += "  Primary Lync Pool: $PoolFQDN"
-    $Report += "  Domain: cvesd.org"
+    $Report += "  Domain: $Domain"
     $Report += ""
     
     # Voice-enabled statistics
@@ -160,7 +179,7 @@ try {
     $Pools = Get-CsPool -ErrorAction SilentlyContinue
     if ($Pools) {
         # Categorize pools by type
-        $StandardPools = $Pools | Where-Object { $_.Fqdn -like "*lync*" -or $_.Fqdn -like "*cvesd.org" -and $_.Fqdn -notlike "*MSSBA*" -and $_.Fqdn -notlike "*ivr*" }
+        $StandardPools = $Pools | Where-Object { $_.Fqdn -like "*lync*" -or $_.Fqdn -like "*$Domain" -and $_.Fqdn -notlike "*MSSBA*" -and $_.Fqdn -notlike "*ivr*" }
         $SBAPools = $Pools | Where-Object { $_.Fqdn -like "*MSSBA*" }
         $IVRPools = $Pools | Where-Object { $_.Fqdn -like "*ivr*" }
         $EdgePools = $Pools | Where-Object { $_.Fqdn -like "*edge*" }
@@ -176,7 +195,7 @@ try {
         
         # Key infrastructure pools
         $Report += "KEY INFRASTRUCTURE POOLS:"
-        $KeyPools = @($PoolFQDN, "nedgepool1.cvesd.org", "officewebapps.cvesd.org", "lyncsqlwitness.cvesd.org")
+        $KeyPools = @($PoolFQDN) + $AdditionalKeyPools
         $KeyPools | ForEach-Object {
             $Pool = $Pools | Where-Object { $_.Fqdn -eq $_ }
             if ($Pool) {
@@ -383,7 +402,7 @@ try {
             $Report += "  Max Endpoints Per User: $($_.MaxEndpointsPerUser)"
             $Report += "  Pool State: $($_.PoolState)"
             
-            # Endpoint expiration settings (actual properties from CVESD)
+            # Endpoint expiration settings
             $Report += "  Endpoint Expiration Settings:"
             $Report += "    Minimum: $($_.MinEndpointExpiration) seconds"
             $Report += "    Default: $($_.DefaultEndpointExpiration) seconds"
@@ -531,13 +550,13 @@ try {
 } catch {}
 $Report += $Separator
 $Report += "Report completed: $(Get-Date)"
-$Report += "Generated for: Chula Vista Elementary School District"
+$Report += "Generated for: $OrganizationName"
 
 # Export report
 $Report | Out-File -FilePath $ReportPath -Encoding UTF8
 
 Write-Host ""
-Write-Host "CVESD LYNC COMPREHENSIVE REPORT COMPLETE" -ForegroundColor Cyan
+Write-Host "LYNC COMPREHENSIVE REPORT COMPLETE" -ForegroundColor Cyan
 Write-Host "Report saved to: $ReportPath" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Key findings will be highlighted in the report for your review." -ForegroundColor Green
